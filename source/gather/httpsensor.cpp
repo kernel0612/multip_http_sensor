@@ -391,6 +391,9 @@ int http_sensor::read_config(){
 	  return 0;
 }
 int http_sensor::load_config(const char* xml){
+	if(!xml){
+		return -1;
+	}
 	configure::global_config* config=
 	configure::global_config::get_instance();
 	if(!config){
@@ -404,17 +407,20 @@ int http_sensor::load_config(const char* xml){
     }
     if(!pdoc->LoadFile()){
     	ACE_DEBUG((LM_ERROR,"load xmlfile  error  %s.\n",pdoc->ErrorDesc()));
+    	delete pdoc;
     	return -1;
     }
     TiXmlElement * root=pdoc->RootElement();
     if(root){
     	 TiXmlElement* berkeleydb=root->FirstChildElement();
     	 if(!berkeleydb){
+    		 delete pdoc;
     		 return -1;
     	 }
     	 TiXmlElement* bklchild=berkeleydb->FirstChildElement();
     	 for(;bklchild;bklchild=bklchild->NextSiblingElement()){
     		 TiXmlAttribute* att=bklchild->FirstAttribute();
+    		 cout <<bklchild->GetText()<<endl;
     		 if(att){
     			 if(strcmp(att->Name(),"db_name")==0){
     				 config->_bdb_capteddb_home=att->Value();
@@ -444,6 +450,7 @@ int http_sensor::load_config(const char* xml){
     	 }
     	 TiXmlElement* psqldb=berkeleydb->NextSiblingElement();
     	 if(!psqldb){
+    		 delete pdoc;
     		 return -1;
     	 }
          TiXmlElement* psqlchild=psqldb->FirstChildElement();
@@ -478,6 +485,7 @@ int http_sensor::load_config(const char* xml){
          }
       	 TiXmlElement* ssdb=berkeleydb->NextSiblingElement();
         	 if(!ssdb){
+        		 delete pdoc;
         		 return -1;
         	 }
              TiXmlElement* ssdbchild=ssdb->FirstChildElement();
@@ -530,5 +538,6 @@ int http_sensor::load_config(const char* xml){
              cout <<config->_ssdb_ip<<endl;
              cout <<config->_ssdb_port<<endl;
     }
+    delete pdoc;
 	return 0;
 }
