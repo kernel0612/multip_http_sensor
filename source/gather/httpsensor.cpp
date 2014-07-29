@@ -419,35 +419,34 @@ int http_sensor::load_config(const char* xml){
     	 }
     	 TiXmlElement* bklchild=berkeleydb->FirstChildElement();
     	 for(;bklchild;bklchild=bklchild->NextSiblingElement()){
-    		 TiXmlAttribute* att=bklchild->FirstAttribute();
-    		 cout <<bklchild->GetText()<<endl;
-    		 cout <<bklchild->Value()<<endl;
-    		 if(att){
-    			 if(strcmp(att->Name(),"db_name")==0){
-    				 config->_bdb_capteddb_home=att->Value();
+    		 const char* labelName=bklchild->Value();
+    		 const char* labelValue=bklchild->GetText();
+
+    			 if(strcmp(labelName,"db_name")==0){
+    				 config->_bdb_capteddb_home=labelValue;
     				 continue;
     			 }
-    			 if(strcmp(att->Name(),"cache_size")==0){
-    				 config->_bdb_cache_size=att->IntValue();
+    			 if(strcmp(labelName,"cache_size")==0){
+    				 config->_bdb_cache_size=atoi(labelValue);
     				 continue;
     			 }
-    			 if(strcmp(att->Name(),"page_size")==0){
-    				 config->_bdb_page_size=att->IntValue();
+    			 if(strcmp(labelName,"page_size")==0){
+    				 config->_bdb_page_size=atoi(labelValue);
     				 continue;
     			 }
-    			 if(strcmp(att->Name(),"deadlock_detect_val")==0){
-    				 config->_bdb_deadlock_detect_val=att->IntValue();
+    			 if(strcmp(labelName,"deadlock_detect_val")==0){
+    				 config->_bdb_deadlock_detect_val=atoi(labelValue);
     				 continue;
     			 }
-    			 if(strcmp(att->Name(),"re_len")==0){
-    				 config->_bdb_re_len=att->IntValue();
+    			 if(strcmp(labelName,"re_len")==0){
+    				 config->_bdb_re_len=atoi(labelValue);
     				 continue;
     			 }
-    			 if(strcmp(att->Name(),"q_extentsize")==0){
-    				 config->_bdb_q_extent_size=att->IntValue();
+    			 if(strcmp(labelName,"q_extentsize")==0){
+    				 config->_bdb_q_extent_size=atoi(labelValue);
     				 continue;
     			 }
-    		 }
+
     	 }
     	 TiXmlElement* psqldb=berkeleydb->NextSiblingElement();
     	 if(!psqldb){
@@ -456,33 +455,33 @@ int http_sensor::load_config(const char* xml){
     	 }
          TiXmlElement* psqlchild=psqldb->FirstChildElement();
          for(;psqlchild;psqlchild=psqlchild->NextSiblingElement()){
-        	 TiXmlAttribute* att=psqlchild->FirstAttribute();
-        	 if(att){
-    			 if(strcmp(att->Name(),"db_name")==0){
-    				 config->_pgsl_db_name=att->Value();
+        	 const char* labelName=bklchild->Value();
+        	 const char* labelValue=bklchild->GetText();
+    			 if(strcmp(labelName,"db_name")==0){
+    				 config->_pgsl_db_name=labelValue;
     				 continue;
     			 }
-    			 if(strcmp(att->Name(),"loginName")==0){
-    				 config->_pgsl_loginName=att->Value();
+    			 if(strcmp(labelName,"loginName")==0){
+    				 config->_pgsl_loginName=labelValue;
     				 continue;
     			 }
-    			 if(strcmp(att->Name(),"passWord")==0){
-    				 config->_pgsl_passWord=att->Value();
+    			 if(strcmp(labelName,"passWord")==0){
+    				 config->_pgsl_passWord=labelValue;
     				 continue;
     			 }
-    			 if(strcmp(att->Name(),"hostName")==0){
-    				 config->_pgsl_hostName=att->Value();
+    			 if(strcmp(labelName,"hostName")==0){
+    				 config->_pgsl_hostName=labelValue;
     				 continue;
     			 }
-    			 if(strcmp(att->Name(),"port")==0){
-    				 config->_pgsl_port=att->IntValue();
+    			 if(strcmp(labelName,"port")==0){
+    				 config->_pgsl_port=atoi(labelValue);
     				 continue;
     			 }
-    			 if(strcmp(att->Name(),"connTimeout")==0){
-    				 config->_pgsl_conn_timeout=att->IntValue();
+    			 if(strcmp(labelName,"connTimeout")==0){
+    				 config->_pgsl_conn_timeout=atoi(labelValue);
     				 continue;
     			 }
-        	 }
+
          }
       	 TiXmlElement* ssdb=berkeleydb->NextSiblingElement();
         	 if(!ssdb){
@@ -491,17 +490,17 @@ int http_sensor::load_config(const char* xml){
         	 }
              TiXmlElement* ssdbchild=ssdb->FirstChildElement();
              for(;ssdbchild;ssdbchild=ssdbchild->NextSiblingElement()){
-            	 TiXmlAttribute* att=ssdbchild->FirstAttribute();
-            	 if(att){
-        			 if(strcmp(att->Name(),"hostIP")==0){
-        				 config->_ssdb_ip=att->Value();
+            	 const char* labelName=bklchild->Value();
+                 const char* labelValue=bklchild->GetText();
+        			 if(strcmp(labelName,"hostIP")==0){
+        				 config->_ssdb_ip=labelValue;
         				 continue;
         			 }
-        			 if(strcmp(att->Name(),"port")==0){
-        				 config->_ssdb_port=att->IntValue();
+        			 if(strcmp(labelName,"port")==0){
+        				 config->_ssdb_port=atoi(labelValue);
         				 continue;
         			 }
-            	 }
+
              }
 //             TiXmlElement* log=berkeleydb->NextSiblingElement();
 //             if(!log){
