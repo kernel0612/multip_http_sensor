@@ -5,7 +5,7 @@ INCLUDEPATH=-I.. -I$(PCAP_include) -I../.. -I../common -I../protocol -I$(ACE_inc
 LIBPATH=-L../common -L../protocol -L$(ACE_lib)  \
 -L$(BOOST_lib) -L$(PCAP_lib) -L$(PGSQL_lib) -L$(LIBXML2_lib) -L$(berkeleyDB_lib)
 
-LIBS=-lstdc++ -lcommons -lnetwork -lprotobuf -lpcap -lACE -lxml2  -lpgtypes -lpq -ldb ../common/libssdb.a
+LIBS=-lstdc++ -lcommons -lnetwork -lprotobuf -lpcap -lACE -lxml2  -lpgtypes -lpq -ldb ../common/libssdb.a ../common/libtinyxml.a
 CPPFLAGS=-ggdb -static -fomit-frame-pointer -pipe -Wall -Wno-deprecated -DDEBUG
 
 SRCS= $(wildcard *.cpp)
