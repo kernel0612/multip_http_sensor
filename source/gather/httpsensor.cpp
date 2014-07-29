@@ -421,6 +421,7 @@ int http_sensor::load_config(const char* xml){
     	 for(;bklchild;bklchild=bklchild->NextSiblingElement()){
     		 TiXmlAttribute* att=bklchild->FirstAttribute();
     		 cout <<bklchild->GetText()<<endl;
+    		 cout <<bklchild->Value()<<endl;
     		 if(att){
     			 if(strcmp(att->Name(),"db_name")==0){
     				 config->_bdb_capteddb_home=att->Value();
