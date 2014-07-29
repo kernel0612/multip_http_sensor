@@ -403,7 +403,7 @@ int http_sensor::load_config(const char* xml){
     	return -1;
     }
     if(!pdoc->LoadFile()){
-    	ACE_DEBUG((LM_ERROR,"load xmlfile  error.\n"));
+    	ACE_DEBUG((LM_ERROR,"load xmlfile  error  %s.\n",pdoc->errorString()));
     	return -1;
     }
     TiXmlElement * root=pdoc->RootElement();
