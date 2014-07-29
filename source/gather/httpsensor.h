@@ -21,8 +21,8 @@
 #include "StreamAuditor.h"
 #include "GatherOutputer.h"
 #include <ace/Process_Manager.h>
-
-
+#include "globalconfig.h"
+#include "tinyxml.h"
 
 #define GATHER_DEFAULT_LOG "/var/log/gather.log"
 #define GATHER_DEFAULT_BUFFER 1024
@@ -85,7 +85,7 @@ public:
 	  // enable or disable debug. Debug informatin will into log file.
 	 // bool debug() const;
 	 // void debug(bool flag);
-
+     int load_config(const char* xml);
 
 private:
 	//Captor<GatherClassifier>* _captor;

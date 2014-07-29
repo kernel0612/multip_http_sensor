@@ -11,7 +11,7 @@ http_sensor::http_sensor():
 classifier_(NULL), stream_dispatcher_(NULL), outputer_(NULL),
 buffer_size_(DEFAULT_BUFFER), max_stream_(DEFAULT_STREAM),
 stream_timeout_(StreamAuditor::STREAM_TIMEOUT), device_id_(0),
-ni_num_(16){
+ni_num_(0){
 	// TODO Auto-generated constructor stub
    // _captor=0;
    // _auditor=0;
@@ -142,7 +142,7 @@ int http_sensor::create(){
 	      ACE_DEBUG((LM_ERROR, " Gather: create captor %d failed: %d. Maybe the interface is invalid.\n", i, ret));
 	      operator delete(captor_[i]);
 	      captor_[i] = NULL;
-	      //return -1;
+	      return -1;
 	    } else {
 	      ACE_DEBUG((LM_DEBUG, " Gather: create captor %d succeed: %d. Maybe the interface is invalid.\n", i, ret));
 	    }
@@ -390,4 +390,110 @@ int http_sensor::read_config(){
 
 	  return 0;
 }
-
+int http_sensor::load_config(const char* xml){
+	configure::global_config* config=
+	configure::global_config::get_instance();
+	if(!config){
+		ACE_DEBUG((LM_ERROR,"get global_config instance error.\n"));
+		return -1;
+	}
+    TiXmlDocument* pdoc=new TiXmlDocument(xml);
+    if(!pdoc){
+    	ACE_DEBUG((LM_ERROR,"create  xml document error.\n"));
+    	return -1;
+    }
+    if(!pdoc->LoadFile()){
+    	ACE_DEBUG((LM_ERROR,"load xmlfile  error.\n"));
+    	return -1;
+    }
+    TiXmlElement * root=pdoc->RootElement();
+    if(root){
+    	 TiXmlElement* berkeleydb=root->FirstChildElement();
+    	 if(!berkeleydb){
+    		 return -1;
+    	 }
+    	 TiXmlElment* bklchild=berkeleydb->FirstChildElement();
+    	 for(;bklchild;bklchild=bklchild->NextSiblingElement()){
+    		 TiXmlAttribute* att=bklchild->FirstAttribute();
+    		 if(att){
+    			 if(strcmp(att->Name(),"db_name")==0){
+    				 config->_bdb_capteddb_home=att->Value();
+    				 continue;
+    			 }
+    			 if(strcmp(att->Name(),"cache_size")==0){
+    				 config->_bdb_cache_size=att->IntValue();
+    				 continue;
+    			 }
+    			 if(strcmp(att->Name(),"page_size")==0){
+    				 config->_bdb_page_size=att->IntValue();
+    				 continue;
+    			 }
+    			 if(strcmp(att->Name(),"deadlock_detect_val")==0){
+    				 config->_bdb_deadlock_detect_val=att->IntValue();
+    				 continue;
+    			 }
+    			 if(strcmp(att->Name(),"re_len")==0){
+    				 config->_bdb_re_len=att->IntValue();
+    				 continue;
+    			 }
+    			 if(strcmp(att->Name(),"q_extentsize")==0){
+    				 config->_bdb_q_extent_size=att->IntValue();
+    				 continue;
+    			 }
+    		 }
+    	 }
+    	 TiXmlElement* psqldb=berkeleydb->NextSiblingElement();
+    	 if(!psqldb){
+    		 return -1;
+    	 }
+         TiXmlElement* psqlchild=psqldb->FirstChildElement();
+         for(;psqlchild;psqlchild=psqlchild->NextSblingElement()){
+        	 TiXmlAttribute* att=psqlchild->FirstAttribute();
+        	 if(att){
+    			 if(strcmp(att->Name(),"db_name")==0){
+    				 config->_pgsl_db_name=att->Value();
+    				 continue;
+    			 }
+    			 if(strcmp(att->Name(),"loginName")==0){
+    				 config->_pgsl_loginName=att->Value();
+    				 continue;
+    			 }
+    			 if(strcmp(att->Name(),"passWord")==0){
+    				 config->_pgsl_passWord=att->Value();
+    				 continue;
+    			 }
+    			 if(strcmp(att->Name(),"hostName")==0){
+    				 config->_pgsl_hostName=att->Value();
+    				 continue;
+    			 }
+    			 if(strcmp(att->Name(),"port")==0){
+    				 config->_pgsl_port=att->IntValue();
+    				 continue;
+    			 }
+    			 if(strcmp(att->Name(),"connTimeout")==0){
+    				 config->_pgsl_conn_timeout=att->IntValue();
+    				 continue;
+    			 }
+        	 }
+         }
+      	 TiXmlElement* ssdb=berkeleydb->NextSiblingElement();
+        	 if(!ssdb){
+        		 return -1;
+        	 }
+             TiXmlElement* ssdbchild=ssdb->FirstChildElement();
+             for(;ssdbchild;ssdbchild=ssdbchild->NextSblingElement()){
+            	 TiXmlAttribute* att=ssdbchild->FirstAttribute();
+            	 if(att){
+        			 if(strcmp(att->Name(),"hostIP")==0){
+        				 config->_ssdb_ip=att->Value();
+        				 continue;
+        			 }
+        			 if(strcmp(att->Name(),"port")==0){
+        				 config->_ssdb_port=att->IntValue();
+        				 continue;
+        			 }
+            	 }
+             }
+    }
+	return 0;
+}
