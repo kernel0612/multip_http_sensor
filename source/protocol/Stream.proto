@@ -1,0 +1,59 @@
+package StreamPackage;
+
+
+message StreamKey{
+   required uint32 saddr=1;
+   required uint32 daddr=2;
+   required uint32 sport=3;
+   required uint32 dport=4;
+}
+message timeval{
+   required int64  tv_sec=1;
+   required int64  tv_usec=2;
+}
+message ORMTransaction{
+   enum direct {DIRECT_UP=0;DIRECT_DOWN=1;};
+   required int64 sid=1;
+   required timeval ts=2;
+   repeated bytes account=3;
+   required uint32 sip=4;
+   required uint32 dip=5;
+   required uint32 sport=6;
+   required uint32 dport=7;
+   required int32 protocol=8;
+   required int32 service=9;
+   required uint32 tcp_seq=10;
+   required uint32 tcp_ack_seq=11;
+   required direct drt=12;
+   required int32 seq=13;
+   required int32 duration=14;
+   required int32 data_len=15;
+   repeated bytes operate=16;
+   repeated bytes object=17;
+   repeated bytes result=18;
+   repeated bytes data=19;
+   
+}
+ message Stream{
+   required StreamKey key=1;
+   repeated bytes mac=2;
+   required timeval begin=3;
+   required int64  live=4;
+   required int32 service=5;
+   required uint32 seq=6;
+   required uint32 ack_seq=7;
+   required int32  stat=8;
+   required int32  flag=9;
+   required int64  sid=10;
+   required int32  devid=11;
+   required int32  rid=12;
+   repeated bytes  account=13;
+   required uint32 bytes=14;
+   required uint32 packets=15;
+   required uint32 records=16;
+   repeated bytes client=17;
+   repeated bytes server=18;
+   repeated bytes response=19;
+   repeated bytes private_data=20;
+   required ORMTransaction  trans=21;
+ }
