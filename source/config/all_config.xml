@@ -1,0 +1,25 @@
+<config>
+	<cap_data_fifo_db>
+	   	<db_home>/home/xlf/db</db_home>
+		<cache_size>1048576</cache_size>
+                <page_size>4096</page_size>
+		<deadlock_detect_val>100000</deadlock_detect_val>
+		<re_len>2048</re_len>
+		<q_extentsize>16384</q_extentsize>
+	</cap_data_fifo_db>
+	<postgreSQL_conf>
+		<db_name>pstDB</db_name>
+		<loginName>xxxx</loginName>
+		<passWord>YYYY</passWord>
+		<hostName>192.168.10.11</hostName>
+		<port>5432</port>
+		<connTimeout>30</connTimeout>
+	</postgreSQL_conf>
+	<ssdb_conf>
+     <hostIP>127.0.0.1</hostIP>
+     <port>8888</port>
+	</ssdb_conf>
+	<log_conf>
+        	<log_home>/home/xlf/log</log_home>
+	</log_conf>
+</config>
