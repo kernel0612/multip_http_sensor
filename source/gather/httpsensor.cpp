@@ -11,7 +11,7 @@ http_sensor::http_sensor():
 classifier_(NULL), stream_dispatcher_(NULL), outputer_(NULL),
 buffer_size_(DEFAULT_BUFFER), max_stream_(DEFAULT_STREAM),
 stream_timeout_(StreamAuditor::STREAM_TIMEOUT), device_id_(0),
-ni_num_(0){
+ni_num_(16){
 	// TODO Auto-generated constructor stub
    // _captor=0;
    // _auditor=0;
