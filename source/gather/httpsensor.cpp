@@ -422,7 +422,7 @@ int http_sensor::load_config(const char* xml){
     		 const char* labelName=bklchild->Value();
     		 const char* labelValue=bklchild->GetText();
 
-    			 if(strcmp(labelName,"db_name")==0){
+    			 if(strcmp(labelName,"db_home")==0){
     				 config->_bdb_capteddb_home=labelValue;
     				 continue;
     			 }
@@ -455,8 +455,8 @@ int http_sensor::load_config(const char* xml){
     	 }
          TiXmlElement* psqlchild=psqldb->FirstChildElement();
          for(;psqlchild;psqlchild=psqlchild->NextSiblingElement()){
-        	 const char* labelName=bklchild->Value();
-        	 const char* labelValue=bklchild->GetText();
+        	 const char* labelName=psqlchild->Value();
+        	 const char* labelValue=psqlchild->GetText();
     			 if(strcmp(labelName,"db_name")==0){
     				 config->_pgsl_db_name=labelValue;
     				 continue;
@@ -490,8 +490,8 @@ int http_sensor::load_config(const char* xml){
         	 }
              TiXmlElement* ssdbchild=ssdb->FirstChildElement();
              for(;ssdbchild;ssdbchild=ssdbchild->NextSiblingElement()){
-            	 const char* labelName=bklchild->Value();
-                 const char* labelValue=bklchild->GetText();
+            	 const char* labelName=ssdbchild->Value();
+                 const char* labelValue=ssdbchild->GetText();
         			 if(strcmp(labelName,"hostIP")==0){
         				 config->_ssdb_ip=labelValue;
         				 continue;
