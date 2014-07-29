@@ -8,6 +8,8 @@
 #ifndef GLOBALCONFIG_H_
 #define GLOBALCONFIG_H_
 #include"ace/Synch.h"
+#include<string>
+using namespace std;
 
 namespace configure {
 
@@ -23,8 +25,8 @@ public:
 
 	//fifo config
 
-	char* _bdb_outputdb_home;
-	char* _bdb_capteddb_home;
+	string _bdb_outputdb_home;
+	string _bdb_capteddb_home;
 	unsigned int _bdb_cache_size;
 	unsigned int _bdb_page_size;
 	unsigned int _bdb_deadlock_detect_val;
@@ -33,21 +35,21 @@ public:
 	//end of fifo config
 
 	//postgreSQL config
-	char* _pgsl_db_name;
-	char* _pgsl_loginName;
-	char* _pgsl_passWord;
-	char* _pgsl_hostName;
+	string _pgsl_db_name;
+	string _pgsl_loginName;
+	string _pgsl_passWord;
+	string _pgsl_hostName;
 	unsigned short _pgsl_port;
 	unsigned short _pgsl_conn_timeout;
 	//end of postgreSQL config;
 
 	//ssdb config
-     char* _ssdb_ip;
+     string _ssdb_ip;
      unsigned short _ssdb_port;
 	//end of ssdb config
 
 	//log config
-	char* _log_home;
+	string _log_home;
 	//end of log config
 
 private:

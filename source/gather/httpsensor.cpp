@@ -412,7 +412,7 @@ int http_sensor::load_config(const char* xml){
     	 if(!berkeleydb){
     		 return -1;
     	 }
-    	 TiXmlElment* bklchild=berkeleydb->FirstChildElement();
+    	 TiXmlElement* bklchild=berkeleydb->FirstChildElement();
     	 for(;bklchild;bklchild=bklchild->NextSiblingElement()){
     		 TiXmlAttribute* att=bklchild->FirstAttribute();
     		 if(att){
@@ -447,7 +447,7 @@ int http_sensor::load_config(const char* xml){
     		 return -1;
     	 }
          TiXmlElement* psqlchild=psqldb->FirstChildElement();
-         for(;psqlchild;psqlchild=psqlchild->NextSblingElement()){
+         for(;psqlchild;psqlchild=psqlchild->NextSiblingElement()){
         	 TiXmlAttribute* att=psqlchild->FirstAttribute();
         	 if(att){
     			 if(strcmp(att->Name(),"db_name")==0){
@@ -481,7 +481,7 @@ int http_sensor::load_config(const char* xml){
         		 return -1;
         	 }
              TiXmlElement* ssdbchild=ssdb->FirstChildElement();
-             for(;ssdbchild;ssdbchild=ssdbchild->NextSblingElement()){
+             for(;ssdbchild;ssdbchild=ssdbchild->NextSiblingElement()){
             	 TiXmlAttribute* att=ssdbchild->FirstAttribute();
             	 if(att){
         			 if(strcmp(att->Name(),"hostIP")==0){
