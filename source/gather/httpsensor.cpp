@@ -483,7 +483,7 @@ int http_sensor::load_config(const char* xml){
     			 }
 
          }
-      	 TiXmlElement* ssdb=berkeleydb->NextSiblingElement();
+      	 TiXmlElement* ssdb=psqldb->NextSiblingElement();
         	 if(!ssdb){
         		 delete pdoc;
         		 return -1;
