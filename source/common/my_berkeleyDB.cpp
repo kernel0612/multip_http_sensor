@@ -4,8 +4,7 @@ my_berkeleyDB::my_berkeleyDB(void)
 {
 	_db=0;
 	_env=0;
-	_bclose=0;
-	_bopen=0;
+	_quit=0;
 	env_home=DBHOME;
 	cache_size=1024*1024;
 	txn_lg_bsize=32*1024;
@@ -19,14 +18,12 @@ my_berkeleyDB::my_berkeleyDB(void)
 	qstats_dump_val=30;
 	re_len=2048;
 	q_extentsize=16*1024;
+	_tid=0;
 }
 
 my_berkeleyDB::~my_berkeleyDB(void)
 {
-	if (_bclose!=0)
-	{
-		this->close();
-	}
+	this->close();
 }
 
 int my_berkeleyDB::open(const char* dbname,DBTYPE type)
@@ -71,13 +68,13 @@ int my_berkeleyDB::open(const char* dbname,DBTYPE type)
 	}
 	deadlock_detect_val=100*1000;
 	start_deadlock_detect_thread();
-	_bopen=1;
-	return ret;
-	
 	return 0;
 }
 int my_berkeleyDB::close()
 {
+	_quit=1;
+	void* ret;
+	pthread_join(_tid,&ret);
     close_bdb_env_db();
 	return 0;
 }
@@ -87,10 +84,7 @@ int my_berkeleyDB::put(char* key,int keySize,void* value,int valueSize)
 	{
 		return -1;
 	}
-	if (!_bopen)
-	{
-		return -1;
-	}
+
 	int ret;
 	DBT dbtKey,dbtValue;
 	memset(&dbtKey,0,sizeof(DBT));
@@ -112,10 +106,6 @@ int my_berkeleyDB::put(char* key,int keySize,void* value,int valueSize)
 int my_berkeleyDB::put(void* value,int valueSize)
 {
 	if (!value||valueSize<=0)
-	{
-		return -1;
-	}
-	if (!_bopen)
 	{
 		return -1;
 	}
@@ -144,10 +134,7 @@ int my_berkeleyDB::get(void** value,int* valueSize)
 	{
 		return -1;
 	}
-	if (!_bopen)
-	{
-		return -1;
-	}
+
 	int ret=0;
 	DBT dbtKey,dbtValue;
 	db_recno_t rec;
@@ -169,10 +156,6 @@ int my_berkeleyDB::get(void** value,int* valueSize)
 int my_berkeleyDB::get(char* key,int keySize,void** value,int* valueSize)
 {
 	if (!key||keySize<=0||!value||valueSize<=0)
-	{
-		return -1;
-	}
-	if (!_bopen)
 	{
 		return -1;
 	}
@@ -289,16 +272,13 @@ void my_berkeleyDB::close_bdb_env_db()
 			fprintf(stderr, "_env->close: OK\n");
 		}
 	}
-	_bclose=1;
-	_bopen=0;
 }
 
 void my_berkeleyDB::start_deadlock_detect_thread()
 {
-	pthread_t tid;
 	if (deadlock_detect_val > 0)
 	{
-		if ((errno = pthread_create(&tid, NULL, bdb_deadlock_detect_thread, (void *)this)) != 0) 
+		if ((errno = pthread_create(&_tid, NULL, bdb_deadlock_detect_thread, (void *)this)) != 0)
 		{
 				fprintf(stderr,
 					"failed spawning deadlock thread: %s\n",
@@ -315,7 +295,7 @@ void * my_berkeleyDB::bdb_deadlock_detect_thread(void *arg)
 	dbenv = pthis->_env;
 	int ret=0;
 	fprintf(stderr, "db deadlock detect thread begin\n");
-	while (!pthis->_bclose) {
+	while (!pthis->_quit) {
 		t.tv_sec = 0;
 		t.tv_usec =pthis->deadlock_detect_val;
 		ret=dbenv->lock_detect(dbenv, 0, DB_LOCK_YOUNGEST, NULL);

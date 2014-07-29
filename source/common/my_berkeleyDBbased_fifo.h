@@ -118,7 +118,11 @@ int my_berkeleyDBbased_fifo<T>::pop_front(T& content)
 //		this->condNotfull.signal();
 //		return 0;
 //	}
-    return _db.get((void**)&p,&size);
+    if(_db.get((void**)&p,&size)==0){
+    	content=*p;
+    	return 0;
+    }
+    return -1;
 }
 template<typename T>
 int my_berkeleyDBbased_fifo<T>::disabled()

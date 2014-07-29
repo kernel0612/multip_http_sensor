@@ -45,7 +45,11 @@ int StreamAuditor::create()
     ACE_DEBUG((LM_ERROR, " StreamAuditor: create stream table failed: %d.\n", ret));
     return -1;
   }
-  if((ret=streammap_->create("127.0.0.1",8888))<0){             //added by xlf 2014/7/28
+  configure::global_config* config=configure::global_config::get_instance();
+  if(!config){
+	  return -1;
+  }
+  if((ret=streammap_->create(config->_ssdb_ip.c_str(),config->_ssdb_port))<0){             //added by xlf 2014/7/28
 	    ACE_DEBUG((LM_ERROR, " StreamAuditor: create stream map failed: %d.\n", ret));
 	    return -1;
   }

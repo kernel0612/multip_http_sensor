@@ -38,9 +38,7 @@ public:
 private:
 	DB* _db;
 	DB_ENV* _env;
-	int _bclose;
-	int _bopen;
-
+	int _quit;
 	char *env_home;
 	u_int32_t cache_size;
 	u_int32_t txn_lg_bsize;
@@ -54,6 +52,7 @@ private:
 	int qstats_dump_val;
 	u_int32_t re_len;
 	u_int32_t q_extentsize;
+	pthread_t   _tid;
 
 };
 #endif

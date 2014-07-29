@@ -494,6 +494,20 @@ int http_sensor::load_config(const char* xml){
         			 }
             	 }
              }
+//             TiXmlElement* log=berkeleydb->NextSiblingElement();
+//             if(!log){
+//            	 return -1;
+//             }
+//             TiXmlElement* logchild=log->FirstChildElement();
+//             for(;logchild;logchild=logchild->NextSiblingElement()){
+//            	 TiXmlAttribute* att=logchild->FirstAttribute();
+//            	 if(att){
+//            		 if(strcmp(att->Name(),"log_home")==0){
+//            			 config->_log_home=att->Value();
+//            			 break;
+//            		 }
+//            	 }
+//             }
     }
 	return 0;
 }

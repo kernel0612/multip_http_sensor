@@ -13,6 +13,7 @@
 #include <ace/Process.h>
 
 #include "StreamMap.h"                 //added by xlf 2014/7/28
+#include "globalconfig.h"              //added by xlf 2014/7/29
 typedef CachedMap<StreamKey, Stream> Stream_Table;
 
 /*!
