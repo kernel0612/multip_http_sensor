@@ -297,9 +297,9 @@ void StreamAuditor::child(pid_t parent)
 	      continue;
 	    }
         sleep(1);
-	    mutex_.acquire();
+	   // mutex_.acquire();
 	    ret = entry_streams(frame);
-	    mutex_.release();
+	   // mutex_.release();
 	    //classifier_.tcp_queue().free(frame);       //modified by xlf 2014/7/21
 	    //Frame = NULL;
 	  }
@@ -523,6 +523,8 @@ int StreamAuditor::new_stream(const Frame &frame, const StreamKey &key)
     repeat_++;
   }
 
+
+
   return ret;
 }
 
@@ -584,6 +586,7 @@ int StreamAuditor::audit_stream(const Stream &stream, int flag) const
 {
   // Write the stream to audit outputer.
   ORMEntity *entity = classifier_.output_queue().malloc();
+  my_berkeleyDBbased_fifo<ORMEntity>* fifo=classifier_.output_fifo();
 
   if (entity == NULL) {
     return -1;
@@ -594,15 +597,24 @@ int StreamAuditor::audit_stream(const Stream &stream, int flag) const
   stream.stream2orm(entity->un.stream);
   entity->len = entity->un.stream.length();
 
-  if (classifier_.output_queue().write(entity) < 0) {
-    classifier_.output_queue().free(entity);
-    return -1;
-  } else {
-    ACE_DEBUG((LM_DEBUG, " StreamAuditor:%s:%d->%s:%d[audit_stream]\n",
-               CIDR::ntos(stream.trans.sip), ntohs(stream.trans.sport),
-               CIDR::ntos(stream.trans.dip), ntohs(stream.trans.dport)));
+  if(fifo->push_back(*entity)<0){
+	  classifier_.output_queue().free(entity);
+	  return -1;
   }
-
+  else{
+	  ACE_DEBUG((LM_DEBUG, " StreamAuditor:%s:%d->%s:%d[audit_stream]\n",
+	  CIDR::ntos(stream.trans.sip), ntohs(stream.trans.sport),
+	  CIDR::ntos(stream.trans.dip), ntohs(stream.trans.dport)));
+  }
+//  if (classifier_.output_queue().write(entity) < 0) {
+//    classifier_.output_queue().free(entity);
+//    return -1;
+//  } else {
+//    ACE_DEBUG((LM_DEBUG, " StreamAuditor:%s:%d->%s:%d[audit_stream]\n",
+//               CIDR::ntos(stream.trans.sip), ntohs(stream.trans.sport),
+//               CIDR::ntos(stream.trans.dip), ntohs(stream.trans.dport)));
+//  }
+  classifier_.output_queue().free(entity);
   return 0;
 }
 
@@ -687,7 +699,7 @@ int StreamAuditor::audit_transaction(Stream &stream, int flag) const
 int StreamAuditor::audit_more_transaction(Stream &stream)
 {
   ORMEntity *entity = NULL;
-
+  my_berkeleyDBbased_fifo<ORMEntity>* fifo=classifier_.output_fifo();
   for (int i = 0; i < dissector_.trans_num_; i++) {
     entity = classifier_.output_queue().malloc();
 
@@ -704,19 +716,32 @@ int StreamAuditor::audit_more_transaction(Stream &stream)
     dissector_.trans_[i].data_len = 0;
     entity->len = entity->un.trans.length();
 
-    if (classifier_.output_queue().write(entity) < 0) {
-      classifier_.output_queue().free(entity);
-      ACE_DEBUG((LM_ERROR, " StreamAuditor: %s:%d->%s:%d[audit_transaction] write output_queue failed.\n",
-                 CIDR::ntos(stream.trans.sip), ntohs(stream.trans.sport),
-                 CIDR::ntos(stream.trans.dip), ntohs(stream.trans.dport)));
-      return -1;
-    } else {
-      ACE_DEBUG((LM_DEBUG, " StreamAuditor: %s:%d->%s:%d[audit_transaction] write succeed.\n",
-                 CIDR::ntos(stream.trans.sip), ntohs(stream.trans.sport),
-                 CIDR::ntos(stream.trans.dip), ntohs(stream.trans.dport)));
+//    if (classifier_.output_queue().write(entity) < 0) {
+//      classifier_.output_queue().free(entity);
+//      ACE_DEBUG((LM_ERROR, " StreamAuditor: %s:%d->%s:%d[audit_transaction] write output_queue failed.\n",
+//                 CIDR::ntos(stream.trans.sip), ntohs(stream.trans.sport),
+//                 CIDR::ntos(stream.trans.dip), ntohs(stream.trans.dport)));
+//      return -1;
+//    } else {
+//      ACE_DEBUG((LM_DEBUG, " StreamAuditor: %s:%d->%s:%d[audit_transaction] write succeed.\n",
+//                 CIDR::ntos(stream.trans.sip), ntohs(stream.trans.sport),
+//                 CIDR::ntos(stream.trans.dip), ntohs(stream.trans.dport)));
+//    }
+
+    if(fifo->push_back(*entity)<0){
+    	classifier_.output_queue().free(entity);
+    	return -1;
+    	      ACE_DEBUG((LM_ERROR, " StreamAuditor: %s:%d->%s:%d[audit_transaction] write output_queue failed.\n",
+    	                 CIDR::ntos(stream.trans.sip), ntohs(stream.trans.sport),
+    	                 CIDR::ntos(stream.trans.dip), ntohs(stream.trans.dport)));
+    }
+    else{
+    	      ACE_DEBUG((LM_ERROR, " StreamAuditor: %s:%d->%s:%d[audit_transaction] write output_queue failed.\n",
+    	                 CIDR::ntos(stream.trans.sip), ntohs(stream.trans.sport),
+    	                 CIDR::ntos(stream.trans.dip), ntohs(stream.trans.dport)));
     }
   }
-
+  classifier_.output_queue().free(entity);
   return 0;
 }
 
@@ -807,5 +832,210 @@ int StreamAuditor::fin_telnet_jump(const Stream &stream)
   }
 
   return -1;
+}
+int StreamAuditor::entry_parse(const Frame& frame){
+	  int ret = 0;
+	  StreamKey key = {0};
+
+	  if (key.copy(frame) < 0) {
+	    return -1;
+	  }
+
+	  const struct tcphdr *tcph = frame.tcphdr();
+
+	  if (tcph == NULL) {
+	    return -1;
+	  }
+
+	#if 0
+	  ACE_DEBUG((LM_DEBUG, " StreamAuditor: %s:%d->%s:%d\n", CIDR::ntos(key.saddr),
+	             ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
+	#endif
+
+	  if (tcph->syn) {
+	#if 0
+	    ACE_DEBUG((LM_DEBUG, " StreamAuditor:%s:%d->%s:%d[syn]\n", CIDR::ntos(key.saddr),
+	               ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
+	#endif
+
+	    if (tcph->ack) {
+	      key.reverse();  // modify the direct of stream.
+	    }
+
+	    if (streammap_->find(key)!= NULL) {
+	      repeat_++;
+	    } else {
+	#if 0
+	      ACE_DEBUG((LM_DEBUG, "StreamAuditor:%s:%d->%s:%d[syn][new_stream]\n", CIDR::ntos(key.saddr),
+	                 ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
+	#endif
+	      // ret = new_stream(frame, key);
+	    }
+	  } else if (tcph->fin) {// If FIN, set a STATUS. not erase it.
+	#if 0
+	    ACE_DEBUG((LM_DEBUG, "StreamAuditor:%s:%d->%s:%d[fin]\n", CIDR::ntos(key.saddr),
+	               ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
+	#endif
+	   Stream* stream=streammap_->find(key);
+	       if (stream != NULL || (stream = streammap_->find(key.reverse())) != NULL) {
+	         stream->live = frame.ts.tv_sec;
+	         fin_stream(*stream);//TODO
+	         streammap_->erase(key);
+	         fin_++;
+	       }
+	  } else if (tcph->rst) {// RST
+	#if 0
+	    ACE_DEBUG((LM_DEBUG, "StreamAuditor:%s:%d->%s:%d[rst]\n", CIDR::ntos(key.saddr),
+	               ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
+	#endif
+
+	    if (tcph->window == htons(5840)) {
+	      ACE_DEBUG((LM_DEBUG, "%s:%d->%s:%d[rst][window]==htons(5840)\n", CIDR::ntos(key.saddr),
+	                 ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
+	      return 0;
+	    }
+
+	      Stream* stream=streammap_->find(key);
+	          if (stream != NULL || (stream = streammap_->find(key.reverse())) != NULL) {
+	            stream->live = frame.ts.tv_sec;
+	            fin_stream(*stream);//TODO
+	            table_->erase(key);
+	            fin_++;
+	          }
+	  } else {// Just process data.
+	      Stream* stream=streammap_->find(key);
+
+	    if (stream != NULL || (stream = streammap_->find(key.reverse())) != NULL) {
+	#if 0
+	      ACE_DEBUG((LM_DEBUG, "StreamAuditor:%s:%d->%s:%d. stream != null.\n", CIDR::ntos(key.saddr),
+	                 ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
+	#endif
+	      stream->live = frame.ts.tv_sec;
+	      stream->bytes += frame.caplen;
+	      stream->packets ++;
+
+	      // check repeat frame judged by TCP seq and ack_seq;
+	      if (key.saddr == frame.iphdr()->saddr) {
+	        if (stream->seq == frame.tcphdr()->seq) {
+	          stream->flag = 1;
+	          return 0;
+	        }
+
+	        stream->seq = frame.tcphdr()->seq;
+	      } else {
+	        if (stream->ack_seq == frame.tcphdr()->seq) {
+	          stream->flag = 1;
+	          return 0;
+	        }
+
+	        stream->ack_seq = frame.tcphdr()->seq;
+	      }
+
+	      stream->stat = TCP_ESTABLISHED;
+
+	      if ((ret = dissector_.dissect(*stream, frame)) > 0) {
+	#if 0
+	        ACE_DEBUG((LM_DEBUG, "StreamAuditor dissector_.dissect:%s:%d->%s:%d. ret=%d "
+	                   "stream != null.\n", CIDR::ntos(key.saddr),
+	                   ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport), ret));
+	#endif
+	        check_telnet_jump(*stream, frame, ret);
+	        audit_transaction(*stream, ret);
+	      }
+
+	      if (dissector_.trans_num_ > 0) {
+	        audit_more_transaction(*stream);
+	        dissector_.trans_num_ = 0;
+	      }
+	    } else {
+	      ACE_DEBUG((LM_DEBUG, "StreamAuditor:%s:%d->%s:%d. new stream.\n", CIDR::ntos(key.saddr),
+	                 ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
+
+	      // has push means has data. If not has stream then new one.
+	      // attention the key direction.
+	      if (tcph->psh) {
+	        if (ServiceDef::find(ntohs(key.dport)) > 0) {
+	          ret = new_stream(frame, key);
+	        }
+	      }
+	    }
+	  }
+	  return 0;
+}
+int StreamAuditor::parse_request_data(RequestInfo& request,const Frame& frame){
+	  int ret=0;
+	  int k=0;
+	  char temp[1536]={0};
+	  char* seg=0;
+	  StreamKey key = {0};
+	  ret=key.copy(frame);
+	  if(ret<0){
+		  return -1;
+	  }
+	  request.sip=key.saddr;
+	  request.sport=key.sport;
+	  request.dip=key.daddr;
+	  request.dport=key.dport;
+	  const char* payload=0;
+	  int len=frame.payload(&payload);
+	  if(len<=0){
+		  return -1;
+	  }
+	  for(int i=0;i<len;i++){
+          if(payload[i]=='\n'&&payload[i+1]=='\r'){
+        	  memset(temp,0,1536);
+        	  memcpy(temp,payload+i-k,k);
+        	  k=0;
+        	  if(strstr(temp,"GET")==0||strstr(temp,"POST")==0){
+        		  // new  interaction
+        	  }
+              if(strstr(temp,"Accept")){
+            	  seg=temp+strlen("Accept: ");
+            	  strncpy(request.accept,seg,std::min((const int)strlen(seg),ACCEPT_BUF_SIZE-1));
+              }
+              if(strstr(temp,"Referer")){
+              	  seg=temp+strlen("Referer: ");
+                  strncpy(request.referer,seg,std::min((const int)strlen(seg),REFERER_BUF_SIZE-1));
+              }
+              if(strstr(temp,"Accept-Encoding")){
+            	  seg=temp+strlen("Accept-Encoding: ");
+            	  strncpy(request.acceptEncoding,seg,std::min((const int)strlen(seg),ACCEPTENCODE_BUF_SIZE-1));
+              }
+              if(strstr(temp,"User-Agent")){
+            	  seg=temp+strlen("User-Agent: ");
+            	  strncpy(request.userAgent,seg,std::min((const int)strlen(seg),USERAGENT_BUF_SIZE-1));
+              }
+              if(strstr(temp,"Host")){
+            	  seg=temp+strlen("Host: ");
+            	  strncpy(request.host,seg,std::min((const int)strlen(seg),HOST_BUF_SIZE-1));
+              }
+              if(strstr(temp,"Cookie")){
+               	  seg=temp+strlen("Cookie: ");
+                  strncpy(request.cookie,seg,std::min((const int)strlen(seg),COOKIE_BUF_SIZE-1));
+              }
+			  if ((i+3)<len){               //正文部分
+				  if (payload[i]=='\r'&&payload[i+1]=='\n'&&payload[i+2]=='\r'&&payload[i+3]=='\n')  //
+				  {
+					  if (len==i+4)
+					  {
+						   //no content
+						  break;
+					  }
+					  memcpy(request.requestContent,payload+i+4,std::min(128,len-i-4));
+					  break;
+				  }
+			  }
+
+          }
+          else{
+        	  k++;
+        	  continue;
+          }
+	  }
+
+	return -1;
+}
+int StreamAuditor::parse_response_data(ResponseInfo& response,const Frame& frame){
+	return -1;
 }
 

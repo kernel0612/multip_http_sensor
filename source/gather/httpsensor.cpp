@@ -516,27 +516,27 @@ int http_sensor::load_config(const char* xml){
 //            		 }
 //            	 }
 //             }
-             cout <<config->_bdb_outputdb_home<<endl;
-             cout <<config->_bdb_capteddb_home<<endl;
-             cout <<config->_bdb_cache_size<<endl;
-             cout <<config->_bdb_page_size<<endl;
-             cout <<config->_bdb_deadlock_detect_val<<endl;
-             cout <<config->_bdb_re_len<<endl;
-             cout <<config->_bdb_q_extent_size<<endl;
-         	//end of fifo config
-
-         	//postgreSQL config
-             cout <<config->_pgsl_db_name<<endl;
-             cout <<config->_pgsl_loginName<<endl;
-             cout <<config->_pgsl_passWord<<endl;
-             cout <<config->_pgsl_hostName<<endl;
-             cout <<config->_pgsl_port<<endl;
-             cout <<config->_pgsl_conn_timeout<<endl;
-         	//end of postgreSQL config;
-
-         	//ssdb config
-             cout <<config->_ssdb_ip<<endl;
-             cout <<config->_ssdb_port<<endl;
+//             cout <<config->_bdb_outputdb_home<<endl;
+//             cout <<config->_bdb_capteddb_home<<endl;
+//             cout <<config->_bdb_cache_size<<endl;
+//             cout <<config->_bdb_page_size<<endl;
+//             cout <<config->_bdb_deadlock_detect_val<<endl;
+//             cout <<config->_bdb_re_len<<endl;
+//             cout <<config->_bdb_q_extent_size<<endl;
+//         	//end of fifo config
+//
+//         	//postgreSQL config
+//             cout <<config->_pgsl_db_name<<endl;
+//             cout <<config->_pgsl_loginName<<endl;
+//             cout <<config->_pgsl_passWord<<endl;
+//             cout <<config->_pgsl_hostName<<endl;
+//             cout <<config->_pgsl_port<<endl;
+//             cout <<config->_pgsl_conn_timeout<<endl;
+//         	//end of postgreSQL config;
+//
+//         	//ssdb config
+//             cout <<config->_ssdb_ip<<endl;
+//             cout <<config->_ssdb_port<<endl;
     }
     delete pdoc;
 	return 0;

@@ -14,6 +14,7 @@
 
 #include "StreamMap.h"                 //added by xlf 2014/7/28
 #include "globalconfig.h"              //added by xlf 2014/7/29
+#include "commondef.h"                 //added by xlf 2014/7/30
 typedef CachedMap<StreamKey, Stream> Stream_Table;
 
 /*!
@@ -87,6 +88,12 @@ private:
   int check_telnet_jump(const Stream &stream, const Frame &frame, int flag);
   int fin_telnet_jump(const Stream &stream);
 
+  int entry_parse(const Frame& frame);
+  int parse_request_data(RequestInfo& request,const Frame& frame);
+  int parse_response_data(ResponseInfo& response,const Frame& frame);
+
+
+
 protected:
   //! Classifier.
   GatherClassifier &classifier_;
@@ -113,6 +120,11 @@ protected:
   int syn_;
   int fin_;
   int repeat_;	// repeat stream statistic.
+
+  std::map<StreamKey,std::vector<RequestInfo> >  _request_table;
+  std::map<StreamKey,std::vector<ResponseInfo> > _response_table;
+
+  //std::map<StreamKey, std::vector<Stream> > _stream_table;
 };
 
 

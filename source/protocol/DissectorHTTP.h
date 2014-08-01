@@ -3,6 +3,7 @@
 
 #include "Stream.h"
 #include "Frame.h"
+
 /*!
  * @brief The class defines HTTP protocol dissector.
  */
