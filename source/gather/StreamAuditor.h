@@ -94,6 +94,24 @@ private:
 
 
 
+  int tcp_init(int);
+  void process_tcp(u_char *, int);
+  void process_tcp_frame(const Frame& frame);
+  static void
+  add_tcp_closing_timeout(struct tcp_stream * a_tcp);
+  struct tcp_stream *
+  find_stream(struct tcphdr * this_tcphdr, struct ip * this_iphdr,
+  	    int *from_client);
+  struct tcp_stream *
+  nids_find_tcp_stream(struct tuple4 *addr);
+  static void
+  add_new_tcp(struct tcphdr * this_tcphdr, struct ip * this_iphdr);
+  static int
+  get_ts(struct tcphdr * this_tcphdr, unsigned int * ts);
+  static int
+  get_wscale(struct tcphdr * this_tcphdr, unsigned int * ws);
+  void
+  nids_free_tcp_stream(struct tcp_stream * a_tcp);
 protected:
   //! Classifier.
   GatherClassifier &classifier_;

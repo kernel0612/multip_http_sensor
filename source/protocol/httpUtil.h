@@ -23,6 +23,8 @@ public:
 	int parse_response(const char* source,uint32_t len);
 
 
+
+
  inline	string& get_request_method(){
 		return _request_method;
 	 }
@@ -49,6 +51,9 @@ public:
  }
  inline	string& get_request_host(){
 	 return _request_host;
+ }
+ inline string& get_request_connection(){
+	 return _request_connection;
  }
  inline	string& get_request_payload(){
 	 return _request_payload;
@@ -95,6 +100,7 @@ private:
 	string _request_accept;
 	string _request_acceptEncoding;
 	string _request_host;
+	string _request_connection;
 	string _request_payload;
 	string _request_userAgent;
 

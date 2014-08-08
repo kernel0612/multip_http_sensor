@@ -54,7 +54,7 @@ int httpUtil::parse_request(const char* source,uint32_t len){
     get_header_field(headbuff,_request_host,"Host: ");
     get_header_field(headbuff,_request_cookie,"Cookie: ");
     get_header_field(headbuff,_request_acceptLanguage,"Accept-Language: ");
-
+    get_header_field(headbuff,_request_connection,"Connection: ");
     dissect_request_firstLine();
 	uint32_t entitylen=len-headlen;
 	if(entitylen==0){
@@ -197,6 +197,7 @@ void httpUtil::clear_request(){
 	_request_accept="";
 	_request_acceptEncoding="";
 	_request_host="";
+	_request_connection="";
 	_request_payload="";
 	_request_userAgent="";
 }

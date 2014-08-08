@@ -132,6 +132,7 @@ struct RequestInfo
 	char resName[64];
 	char requestContent[128];
 	uint32_t resID;
+	//uint32_t contentFlag;
 };
 
 struct ResponseInfo
@@ -185,4 +186,5 @@ struct nms_account_rule{
 	   char url_mode[16];
 	   char rule_content[2000];
 };
+
 #endif
