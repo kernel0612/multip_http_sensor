@@ -57,6 +57,15 @@ int StreamAuditor::create()
 	    ACE_DEBUG((LM_ERROR, " StreamAuditor: create stream map failed: %d.\n", ret));
 	    return -1;
   }
+  _ipfragReassembler=new IPfragReassemble;
+  if((ret=_ipfragReassembler->init())<0){
+	  return -1;
+  }
+  _tcpReassembler=new TcpReassemble;
+  if((ret=_tcpReassembler->init())<0){
+	  return -1;
+  }
+  _httpReassembler=new HttpReassemble;
   return 0;
 }
 
@@ -76,6 +85,16 @@ int StreamAuditor::destroy()
     mutex_.release();
     table_ = NULL;
     streammap_=0;                        //added by xlf 2014/7/28
+  }
+  if(_ipfragReassembler){
+	  _ipfragReassembler->fini();
+	  delete _ipfragReassembler;
+	  _ipfragReassembler=0;
+  }
+  if(_tcpReassembler){
+	  _tcpReassembler->fini();
+	  delete _tcpReassembler;
+	  _tcpReassembler=0;
   }
 
   return 0;
@@ -302,7 +321,8 @@ void StreamAuditor::child(pid_t parent)
 	    }
         sleep(1);
 	   // mutex_.acquire();
-	    ret = entry_streams(frame);
+	    //ret = entry_streams(frame);
+        ret=entry_parse(frame);
 	   // mutex_.release();
 	    //classifier_.tcp_queue().free(frame);       //modified by xlf 2014/7/21
 	    //Frame = NULL;
@@ -837,649 +857,127 @@ int StreamAuditor::fin_telnet_jump(const Stream &stream)
 
   return -1;
 }
+
 int StreamAuditor::entry_parse(const Frame& frame){
 	  int ret = 0;
 	  StreamKey key = {0};
-
 	  if (key.copy(frame) < 0) {
 	    return -1;
 	  }
-
 	  const struct tcphdr *tcph = frame.tcphdr();
-
 	  if (tcph == NULL) {
 	    return -1;
 	  }
-
-	#if 0
-	  ACE_DEBUG((LM_DEBUG, " StreamAuditor: %s:%d->%s:%d\n", CIDR::ntos(key.saddr),
-	             ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
-	#endif
-
-	  if (tcph->syn) {
-	#if 0
-	    ACE_DEBUG((LM_DEBUG, " StreamAuditor:%s:%d->%s:%d[syn]\n", CIDR::ntos(key.saddr),
-	               ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
-	#endif
-
-	    if (tcph->ack) {
-	      key.reverse();  // modify the direct of stream.
-	    }
-
-	    if (streammap_->find(key)!= NULL) {
-	      repeat_++;
-	    } else {
-	#if 0
-	      ACE_DEBUG((LM_DEBUG, "StreamAuditor:%s:%d->%s:%d[syn][new_stream]\n", CIDR::ntos(key.saddr),
-	                 ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
-	#endif
-	      // ret = new_stream(frame, key);
-	    }
-	  } else if (tcph->fin) {// If FIN, set a STATUS. not erase it.
-	#if 0
-	    ACE_DEBUG((LM_DEBUG, "StreamAuditor:%s:%d->%s:%d[fin]\n", CIDR::ntos(key.saddr),
-	               ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
-	#endif
-	   Stream* stream=streammap_->find(key);
-	       if (stream != NULL || (stream = streammap_->find(key.reverse())) != NULL) {
-	         stream->live = frame.ts.tv_sec;
-	         fin_stream(*stream);//TODO
-	         streammap_->erase(key);
-	         fin_++;
-	       }
-	  } else if (tcph->rst) {// RST
-	#if 0
-	    ACE_DEBUG((LM_DEBUG, "StreamAuditor:%s:%d->%s:%d[rst]\n", CIDR::ntos(key.saddr),
-	               ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
-	#endif
-
-	    if (tcph->window == htons(5840)) {
-	      ACE_DEBUG((LM_DEBUG, "%s:%d->%s:%d[rst][window]==htons(5840)\n", CIDR::ntos(key.saddr),
-	                 ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
-	      return 0;
-	    }
-
-	      Stream* stream=streammap_->find(key);
-	          if (stream != NULL || (stream = streammap_->find(key.reverse())) != NULL) {
-	            stream->live = frame.ts.tv_sec;
-	            fin_stream(*stream);//TODO
-	            table_->erase(key);
-	            fin_++;
-	          }
-	  } else {// Just process data.
-	      Stream* stream=streammap_->find(key);
-
-	    if (stream != NULL || (stream = streammap_->find(key.reverse())) != NULL) {
-	#if 0
-	      ACE_DEBUG((LM_DEBUG, "StreamAuditor:%s:%d->%s:%d. stream != null.\n", CIDR::ntos(key.saddr),
-	                 ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
-	#endif
-	      stream->live = frame.ts.tv_sec;
-	      stream->bytes += frame.caplen;
-	      stream->packets ++;
-
-	      // check repeat frame judged by TCP seq and ack_seq;
-	      if (key.saddr == frame.iphdr()->saddr) {
-	        if (stream->seq == frame.tcphdr()->seq) {
-	          stream->flag = 1;
-	          return 0;
-	        }
-
-	        stream->seq = frame.tcphdr()->seq;
-	      } else {
-	        if (stream->ack_seq == frame.tcphdr()->seq) {
-	          stream->flag = 1;
-	          return 0;
-	        }
-
-	        stream->ack_seq = frame.tcphdr()->seq;
-	      }
-
-	      stream->stat = TCP_ESTABLISHED;
-
-	      if ((ret = dissector_.dissect(*stream, frame)) > 0) {
-	#if 0
-	        ACE_DEBUG((LM_DEBUG, "StreamAuditor dissector_.dissect:%s:%d->%s:%d. ret=%d "
-	                   "stream != null.\n", CIDR::ntos(key.saddr),
-	                   ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport), ret));
-	#endif
-	        check_telnet_jump(*stream, frame, ret);
-	        audit_transaction(*stream, ret);
-	      }
-
-	      if (dissector_.trans_num_ > 0) {
-	        audit_more_transaction(*stream);
-	        dissector_.trans_num_ = 0;
-	      }
-	    } else {
-	      ACE_DEBUG((LM_DEBUG, "StreamAuditor:%s:%d->%s:%d. new stream.\n", CIDR::ntos(key.saddr),
-	                 ntohs(key.sport), CIDR::ntos(key.daddr), ntohs(key.dport)));
-
-	      // has push means has data. If not has stream then new one.
-	      // attention the key direction.
-	      if (tcph->psh) {
-	        if (ServiceDef::find(ntohs(key.dport)) > 0) {
-	          ret = new_stream(frame, key);
-	        }
-	      }
-	    }
+	  if(!_ipfragReassembler){
+		  return -1;
 	  }
-	  return 0;
-}
-int StreamAuditor::parse_request_data(RequestInfo& request,const Frame& frame){
-	  int ret=0;
-	  int k=0;
-	  char temp[1536]={0};
-	  char* seg=0;
-	  StreamKey key = {0};
-	  ret=key.copy(frame);
+	  u_char* data= (u_char*)frame.pkt;
+	  struct ip *iph = (struct ip *)data;
+	  ret=_ipfragReassembler->process((struct ip *)data, (struct ip**)&iph);
+	  int need_free=0;
+	  switch(ret){
+	  case IPF_NOTF:
+		  break;
+	  case IPF_NOTF:
+		  break;
+	  case IPF_NEW:           //完整的ip 数据包
+		  need_free=1;
+		  break;
+	  }
+	  int  skblen = ntohs(iph->ip_len) + 16;
+	  if(!_tcpReassembler){
+		  return -1;
+	  }
+	  tcp_stream tcp;
+	  tcp_stream* ptcp=&tcp;
+	  memset(ptcp,0,sizeof(tcp_stream));
+	  ret=_tcpReassembler->process((u_char*)iph,skblen,&ptcp,0);
 	  if(ret<0){
+		  free(iph);
 		  return -1;
 	  }
-	  request.sip=key.saddr;
-	  request.sport=key.sport;
-	  request.dip=key.daddr;
-	  request.dport=key.dport;
-	  const char* payload=0;
-	  int len=frame.payload(&payload);
-	  if(len<=0){
-		  return -1;
-	  }
-	  for(int i=0;i<len;i++){
-          if(payload[i]=='\n'&&payload[i+1]=='\r'){
-        	  memset(temp,0,1536);
-        	  memcpy(temp,payload+i-k,k);
-        	  k=0;
-        	  if(strstr(temp,"GET")==0||strstr(temp,"POST")==0){
-        		  // new  interaction
-        	  }
-              if(strstr(temp,"Accept")){
-            	  seg=temp+strlen("Accept: ");
-            	  strncpy(request.accept,seg,std::min((const int)strlen(seg),ACCEPT_BUF_SIZE-1));
-              }
-              if(strstr(temp,"Referer")){
-              	  seg=temp+strlen("Referer: ");
-                  strncpy(request.referer,seg,std::min((const int)strlen(seg),REFERER_BUF_SIZE-1));
-              }
-              if(strstr(temp,"Accept-Encoding")){
-            	  seg=temp+strlen("Accept-Encoding: ");
-            	  strncpy(request.acceptEncoding,seg,std::min((const int)strlen(seg),ACCEPTENCODE_BUF_SIZE-1));
-              }
-              if(strstr(temp,"User-Agent")){
-            	  seg=temp+strlen("User-Agent: ");
-            	  strncpy(request.userAgent,seg,std::min((const int)strlen(seg),USERAGENT_BUF_SIZE-1));
-              }
-              if(strstr(temp,"Host")){
-            	  seg=temp+strlen("Host: ");
-            	  strncpy(request.host,seg,std::min((const int)strlen(seg),HOST_BUF_SIZE-1));
-              }
-              if(strstr(temp,"Cookie")){
-               	  seg=temp+strlen("Cookie: ");
-                  strncpy(request.cookie,seg,std::min((const int)strlen(seg),COOKIE_BUF_SIZE-1));
-              }
-			  if ((i+3)<len){               //正文部分
-				  if (payload[i]=='\r'&&payload[i+1]=='\n'&&payload[i+2]=='\r'&&payload[i+3]=='\n')  //
-				  {
-					  if (len==i+4)
-					  {
-						   //no content
-						  break;
-					  }
-					  memcpy(request.requestContent,payload+i+4,std::min(128,len-i-4));
-					  break;
-				  }
-			  }
-
-          }
-          else{
-        	  k++;
-        	  continue;
-          }
-	  }
-
-	return -1;
+	  entry_dissect_http(ptcp);
+	free(iph);
+	return 0;
 }
-int StreamAuditor::parse_response_data(ResponseInfo& response,const Frame& frame){
-	return -1;
-}
-int
-StreamAuditor::tcp_init(int size)
-{
-  int i;
-  struct tcp_timeout *tmp;
-
-  if (!size) return 0;
-  tcp_stream_table_size = size;
-  tcp_stream_table = calloc(tcp_stream_table_size, sizeof(char *));
-  if (!tcp_stream_table) {
-    nids_params.no_mem("tcp_init");
-    return -1;
-  }
-  max_stream = 3 * tcp_stream_table_size / 4;
-  streams_pool = (struct tcp_stream *) malloc((max_stream + 1) * sizeof(struct tcp_stream));
-  if (!streams_pool) {
-    nids_params.no_mem("tcp_init");
-    return -1;
-  }
-  for (i = 0; i < max_stream; i++)
-    streams_pool[i].next_free = &(streams_pool[i + 1]);
-  streams_pool[max_stream].next_free = 0;
-  free_streams = streams_pool;
-  init_hash();
-  while (nids_tcp_timeouts) {
-    tmp = nids_tcp_timeouts->next;
-    free(nids_tcp_timeouts);
-    nids_tcp_timeouts = tmp;
-  }
-  return 0;
-}
-void StreamAuditor::process_tcp(u_char *data, int skblen){
-
-	struct ip *this_iphdr = (struct ip *)data;   //ip header
-	struct tcphdr *this_tcphdr = (struct tcphdr *)(data + 4 * this_iphdr->ip_hl); //tcp header
-	int datalen, iplen;
-	int from_client = 1;
-	unsigned int tmp_ts;
-	struct tcp_stream *a_tcp;
-	struct half_stream *snd, *rcv;
-
-	//ugly_iphdr = this_iphdr;
-	iplen = ntohs(this_iphdr->ip_len);
-	if ((unsigned)iplen < 4 * this_iphdr->ip_hl + sizeof(struct tcphdr)) {
-	  //nids_params.syslog(NIDS_WARN_TCP, NIDS_WARN_TCP_HDR, this_iphdr,
-				 //  this_tcphdr);
-	  return;
-	} // ktos sie bawi
-
-	datalen = iplen - 4 * this_iphdr->ip_hl - 4 * this_tcphdr->th_off;
-
-	if (datalen < 0) {
-	 // nids_params.syslog(NIDS_WARN_TCP, NIDS_WARN_TCP_HDR, this_iphdr,
-				   //this_tcphdr);
-	  return;
-	} // ktos sie bawi
-
-	if ((this_iphdr->ip_src.s_addr | this_iphdr->ip_dst.s_addr) == 0) {
-	  nids_params.syslog(NIDS_WARN_TCP, NIDS_WARN_TCP_HDR, this_iphdr,
-				   this_tcphdr);
-	  return;
+int StreamAuditor::entry_dissect_http(tcp_stream* tcp){
+	if(!tcp){
+		return -1;
 	}
-	if (!(this_tcphdr->th_flags & TH_ACK))
-	  detect_scan(this_iphdr);
-	if (!nids_params.n_tcp_streams) return;
-	//  if (my_tcp_check(this_tcphdr, iplen - 4 * this_iphdr->ip_hl,
-	//		   this_iphdr->ip_src.s_addr, this_iphdr->ip_dst.s_addr)) {
-	//    nids_params.syslog(NIDS_WARN_TCP, NIDS_WARN_TCP_HDR, this_iphdr,
-	//		       this_tcphdr);
-	//   return;
-	//  }
-	#if 0
-	check_flags(this_iphdr, this_tcphdr);
-	//ECN
-	#endif
-	if (!(a_tcp = find_stream(this_tcphdr, this_iphdr, &from_client))) {
-	  if ((this_tcphdr->th_flags & TH_SYN) &&
-		!(this_tcphdr->th_flags & TH_ACK) &&
-		!(this_tcphdr->th_flags & TH_RST))
-		add_new_tcp(this_tcphdr, this_iphdr);
-	  return;
-	}
-	if (from_client) {
-	  snd = &a_tcp->client;
-	  rcv = &a_tcp->server;
-	}
-	else {
-	  rcv = &a_tcp->client;
-	  snd = &a_tcp->server;
-	}
-	if ((this_tcphdr->th_flags & TH_SYN)) {
-	  if (from_client || a_tcp->client.state != TCP_SYN_SENT ||
-		a_tcp->server.state != TCP_CLOSE || !(this_tcphdr->th_flags & TH_ACK))
-		return;
-	  if (a_tcp->client.seq != ntohl(this_tcphdr->th_ack))
-		return;
-	  a_tcp->server.state = TCP_SYN_RECV;
-	  a_tcp->server.seq = ntohl(this_tcphdr->th_seq) + 1;
-	  a_tcp->server.first_data_seq = a_tcp->server.seq;
-	  a_tcp->server.ack_seq = ntohl(this_tcphdr->th_ack);
-	  a_tcp->server.window = ntohs(this_tcphdr->th_win);
-	  if (a_tcp->client.ts_on) {
-		a_tcp->server.ts_on = get_ts(this_tcphdr, &a_tcp->server.curr_ts);
-		if (!a_tcp->server.ts_on)
-			a_tcp->client.ts_on = 0;
-	  } else a_tcp->server.ts_on = 0;
-	  if (a_tcp->client.wscale_on) {
-		a_tcp->server.wscale_on = get_wscale(this_tcphdr, &a_tcp->server.wscale);
-		if (!a_tcp->server.wscale_on) {
-			a_tcp->client.wscale_on = 0;
-			a_tcp->client.wscale  = 1;
-			a_tcp->server.wscale = 1;
+	int ret=0;
+	httpdata* complete;
+	httpfrag frag;
+	if(tcp->nids_state==NIDS_JUST_EST){
+		if (tcp->addr.dest != 80){
+			return -1;
 		}
-	  } else {
-		a_tcp->server.wscale_on = 0;
-		a_tcp->server.wscale = 1;
-	  }
-	  return;
+		tcp->client.collect++;
+		tcp->server.collect++;
+		return -1;
 	}
-	if (
-		! (  !datalen && ntohl(this_tcphdr->th_seq) == rcv->ack_seq  )
-		&&
-		( !before(ntohl(this_tcphdr->th_seq), rcv->ack_seq + rcv->window*rcv->wscale) ||
-			before(ntohl(this_tcphdr->th_seq) + datalen, rcv->ack_seq)
-		  )
-	   )
-	   return;
-
-	if ((this_tcphdr->th_flags & TH_RST)) {
-	  if (a_tcp->nids_state == NIDS_DATA) {
-		struct lurker_node *i;
-
-		a_tcp->nids_state = NIDS_RESET;
-		for (i = a_tcp->listeners; i; i = i->next)
-		(i->item) (a_tcp, &i->data);
-	  }
-	  nids_free_tcp_stream(a_tcp);
-	  return;
+	if(tcp->nids_state==NIDS_CLOSE){
+		return -1;
 	}
+	if(tcp->nids_state==NIDS_RESET){
+		return -1;
+	}
+	if(tcp->nids_state==NIDS_DATA){
+		struct half_stream *hlf;
+		if(tcp->client.count_new){
+			hlf=&tcp->client;
+			memset(&frag,0,sizeof(httpfrag));
+			frag.frag=hlf->data;
+			frag.fraglen=hlf->count_new;
+			frag.type=requestfrag;
+			ret=_httpReassembler->process_httpfrag(&frag,&complete);
+			if(ret==0){
+				ret=_httputil->parse_response(complete->data,complete->datalen);
+				if(ret==0){
+					_httputil->get_response_code();
+					_httputil->get_response_date();
+					_httputil->get_response_contentType();
+					_httputil->get_response_transferEncoding();
+					_httputil->get_response_contentLength();
+					_httputil->get_response_connection();
+					_httputil->get_response_payload();
+				}
 
-	/* PAWS check */
-	if (rcv->ts_on && get_ts(this_tcphdr, &tmp_ts) &&
-		before(tmp_ts, snd->curr_ts))
-	return;
-
-	if ((this_tcphdr->th_flags & TH_ACK)) {
-	  if (from_client && a_tcp->client.state == TCP_SYN_SENT &&
-		a_tcp->server.state == TCP_SYN_RECV) {
-		if (ntohl(this_tcphdr->th_ack) == a_tcp->server.seq) {
-		a_tcp->client.state = TCP_ESTABLISHED;
-		a_tcp->client.ack_seq = ntohl(this_tcphdr->th_ack);
-		{
-		  struct proc_node *i;
-		  struct lurker_node *j;
-		  void *data;
-
-		  a_tcp->server.state = TCP_ESTABLISHED;
-		  a_tcp->nids_state = NIDS_JUST_EST;
-		  for (i = tcp_procs; i; i = i->next) {
-			char whatto = 0;
-			char cc = a_tcp->client.collect;
-			char sc = a_tcp->server.collect;
-			char ccu = a_tcp->client.collect_urg;
-			char scu = a_tcp->server.collect_urg;
-
-			(i->item) (a_tcp, &data);
-			if (cc < a_tcp->client.collect)
-			  whatto |= COLLECT_cc;
-			if (ccu < a_tcp->client.collect_urg)
-			  whatto |= COLLECT_ccu;
-			if (sc < a_tcp->server.collect)
-			  whatto |= COLLECT_sc;
-			if (scu < a_tcp->server.collect_urg)
-			  whatto |= COLLECT_scu;
-			if (nids_params.one_loop_less) {
-					if (a_tcp->client.collect >=2) {
-						a_tcp->client.collect=cc;
-						whatto&=~COLLECT_cc;
-					}
-					if (a_tcp->server.collect >=2 ) {
-						a_tcp->server.collect=sc;
-						whatto&=~COLLECT_sc;
-					}
 			}
-			if (whatto) {
-			  j = mknew(struct lurker_node);
-			  j->item = i->item;
-			  j->data = data;
-			  j->whatto = whatto;
-			  j->next = a_tcp->listeners;
-			  a_tcp->listeners = j;
+		}
+		if(tcp->server.count_new){
+			hlf=&tcp->server;
+			memset(&frag,0,sizeof(httpfrag));
+			frag.frag=hlf->data;
+			frag.fraglen=hlf->count_new;
+			frag.type=responsefrag;
+			ret=_httpReassembler->process_httpfrag(&frag,&complete);
+			if(ret==0){
+				ret=_httputil->parse_response(complete->data,complete->datalen);
+				if(ret==0){
+					_httputil->get_request_method();
+					_httputil->get_request_url();
+					_httputil->get_request_httpType();
+					_httputil->get_request_acceptLanguage();
+					_httputil->get_request_referer();
+					_httputil->get_request_cookie();
+					_httputil->get_request_accept();
+					_httputil->get_request_acceptEncoding();
+					_httputil->get_request_host();
+					_httputil->get_request_connection();
+					_httputil->get_request_payload();
+					_httputil->get_request_userAgent();
+
+					_inputdatabase->get_ipaddress();
+					_inputdatabase->get_ipaddress();
+					for(int i=0;i<size();i++){
+						//匹配
+					}
+
+				}
+
 			}
-		  }
-		  if (!a_tcp->listeners) {
-			nids_free_tcp_stream(a_tcp);
-			return;
-		  }
-		  a_tcp->nids_state = NIDS_DATA;
+
 		}
-		}
-		// return;
-	  }
 	}
-	if ((this_tcphdr->th_flags & TH_ACK)) {
-	  handle_ack(snd, ntohl(this_tcphdr->th_ack));
-	  if (rcv->state == FIN_SENT)
-		rcv->state = FIN_CONFIRMED;
-	  if (rcv->state == FIN_CONFIRMED && snd->state == FIN_CONFIRMED) {
-		struct lurker_node *i;
-
-		a_tcp->nids_state = NIDS_CLOSE;
-		for (i = a_tcp->listeners; i; i = i->next)
-		(i->item) (a_tcp, &i->data);
-		nids_free_tcp_stream(a_tcp);
-		return;
-	  }
-	}
-	if (datalen + (this_tcphdr->th_flags & TH_FIN) > 0)
-	  tcp_queue(a_tcp, this_tcphdr, snd, rcv,
-			  (char *) (this_tcphdr) + 4 * this_tcphdr->th_off,
-			  datalen, skblen);
-	snd->window = ntohs(this_tcphdr->th_win);
-	if (rcv->rmem_alloc > 65535)
-	  prune_queue(rcv, this_tcphdr);
-	if (!a_tcp->listeners)
-	  nids_free_tcp_stream(a_tcp);
-}
-void StreamAuditor::process_tcp_frame(const Frame& frame){
-	int from_client=1;
-	struct tcp_stream *a_tcp;
-	struct half_stream *snd, *rcv;
-	int caplen=frame.caplen;
-	int datalen=0;
-
-}
-
-struct tcp_stream *
-StreamAuditor::find_stream(struct tcphdr * this_tcphdr, struct ip * this_iphdr,
-	    int *from_client)
-{
-  struct tuple4 this_addr, reversed;
-  struct tcp_stream *a_tcp;
-
-  this_addr.source = ntohs(this_tcphdr->th_sport);
-  this_addr.dest = ntohs(this_tcphdr->th_dport);
-  this_addr.saddr = this_iphdr->ip_src.s_addr;
-  this_addr.daddr = this_iphdr->ip_dst.s_addr;
-  a_tcp = nids_find_tcp_stream(&this_addr);
-  if (a_tcp) {
-    *from_client = 1;
-    return a_tcp;
-  }
-  reversed.source = ntohs(this_tcphdr->th_dport);
-  reversed.dest = ntohs(this_tcphdr->th_sport);
-  reversed.saddr = this_iphdr->ip_dst.s_addr;
-  reversed.daddr = this_iphdr->ip_src.s_addr;
-  a_tcp = nids_find_tcp_stream(&reversed);
-  if (a_tcp) {
-    *from_client = 0;
-    return a_tcp;
-  }
-  return 0;
-}
-
-struct tcp_stream *
-StreamAuditor::nids_find_tcp_stream(struct tuple4 *addr)
-{
-  int hash_index;
-  struct tcp_stream *a_tcp;
-
-  hash_index = mk_hash_index(*addr);
-  for (a_tcp = tcp_stream_table[hash_index];
-       a_tcp && memcmp(&a_tcp->addr, addr, sizeof (struct tuple4));
-       a_tcp = a_tcp->next_node);
-  return a_tcp ? a_tcp : 0;
-}
-
-
-static void
-StreamAuditor::add_new_tcp(struct tcphdr * this_tcphdr, struct ip * this_iphdr)
-{
-  struct tcp_stream *tolink;
-  struct tcp_stream *a_tcp;
-  int hash_index;
-  struct tuple4 addr;
-
-  addr.source = ntohs(this_tcphdr->th_sport);
-  addr.dest = ntohs(this_tcphdr->th_dport);
-  addr.saddr = this_iphdr->ip_src.s_addr;
-  addr.daddr = this_iphdr->ip_dst.s_addr;
-  hash_index = mk_hash_index(addr);
-
-  if (tcp_num > max_stream) {
-    struct lurker_node *i;
-    int orig_client_state=tcp_oldest->client.state;
-    tcp_oldest->nids_state = NIDS_TIMED_OUT;
-    for (i = tcp_oldest->listeners; i; i = i->next)
-      (i->item) (tcp_oldest, &i->data);
-    nids_free_tcp_stream(tcp_oldest);
-    if (orig_client_state!=TCP_SYN_SENT)
-      nids_params.syslog(NIDS_WARN_TCP, NIDS_WARN_TCP_TOOMUCH, ugly_iphdr, this_tcphdr);
-  }
-  a_tcp = free_streams;
-  if (!a_tcp) {
-    fprintf(stderr, "gdb me ...\n");
-    pause();
-  }
-  free_streams = a_tcp->next_free;
-
-  tcp_num++;
-  tolink = tcp_stream_table[hash_index];
-  memset(a_tcp, 0, sizeof(struct tcp_stream));
-  a_tcp->hash_index = hash_index;
-  a_tcp->addr = addr;
-  a_tcp->client.state = TCP_SYN_SENT;
-  a_tcp->client.seq = ntohl(this_tcphdr->th_seq) + 1;
-  a_tcp->client.first_data_seq = a_tcp->client.seq;
-  a_tcp->client.window = ntohs(this_tcphdr->th_win);
-  a_tcp->client.ts_on = get_ts(this_tcphdr, &a_tcp->client.curr_ts);
-  a_tcp->client.wscale_on = get_wscale(this_tcphdr, &a_tcp->client.wscale);
-  a_tcp->server.state = TCP_CLOSE;
-  a_tcp->next_node = tolink;
-  a_tcp->prev_node = 0;
-  if (tolink)
-    tolink->prev_node = a_tcp;
-  tcp_stream_table[hash_index] = a_tcp;
-  a_tcp->next_time = tcp_latest;
-  a_tcp->prev_time = 0;
-  if (!tcp_oldest)
-    tcp_oldest = a_tcp;
-  if (tcp_latest)
-    tcp_latest->prev_time = a_tcp;
-  tcp_latest = a_tcp;
-}
-
-
-static int
-StreamAuditor::mk_hash_index(struct tuple4 addr)
-{
-  int hash=mkhash(addr.saddr, addr.source, addr.daddr, addr.dest);
-  return hash % tcp_stream_table_size;
-}
-
-static int
-StreamAuditor::get_ts(struct tcphdr * this_tcphdr, unsigned int * ts)
-{
-  int len = 4 * this_tcphdr->th_off;
-  unsigned int tmp_ts;
-  unsigned char * options = (unsigned char*)(this_tcphdr + 1);
-  int ind = 0, ret = 0;
-  while (ind <=  len - (int)sizeof (struct tcphdr) - 10 )
-  	switch (options[ind]) {
-		case 0: /* TCPOPT_EOL */
-			return ret;
-		case 1: /* TCPOPT_NOP */
-			ind++;
-			continue;
-  		case 8: /* TCPOPT_TIMESTAMP */
-	  		memcpy((char*)&tmp_ts, options + ind + 2, 4);
-  			*ts=ntohl(tmp_ts);
-			ret = 1;
-			/* no break, intentionally */
-		default:
-			if (options[ind+1] < 2 ) /* "silly option" */
-				return ret;
-			ind += options[ind+1];
-	}
-
-  return ret;
-}
-
-static int
-StreamAuditor::get_wscale(struct tcphdr * this_tcphdr, unsigned int * ws)
-{
-  int len = 4 * this_tcphdr->th_off;
-  unsigned int tmp_ws;
-  unsigned char * options = (unsigned char*)(this_tcphdr + 1);
-  int ind = 0, ret = 0;
-  *ws=1;
-  while (ind <=  len - (int)sizeof (struct tcphdr) - 3 )
-  	switch (options[ind]) {
-		case 0: /* TCPOPT_EOL */
-			return ret;
-		case 1: /* TCPOPT_NOP */
-			ind++;
-			continue;
-  		case 3: /* TCPOPT_WSCALE */
-  			tmp_ws=options[ind+2];
-  			if (tmp_ws>14)
-  				tmp_ws=14;
-			*ws=1<<tmp_ws;
-			ret = 1;
-			/* no break, intentionally */
-		default:
-			if (options[ind+1] < 2 ) /* "silly option" */
-				return ret;
-			ind += options[ind+1];
-	}
-
-  return ret;
-}
-void
-StreamAuditor::nids_free_tcp_stream(struct tcp_stream * a_tcp)
-{
-  int hash_index = a_tcp->hash_index;
-  struct lurker_node *i, *j;
-
-  del_tcp_closing_timeout(a_tcp);
-  purge_queue(&a_tcp->server);
-  purge_queue(&a_tcp->client);
-
-  if (a_tcp->next_node)
-    a_tcp->next_node->prev_node = a_tcp->prev_node;
-  if (a_tcp->prev_node)
-    a_tcp->prev_node->next_node = a_tcp->next_node;
-  else
-    tcp_stream_table[hash_index] = a_tcp->next_node;
-  if (a_tcp->client.data)
-    free(a_tcp->client.data);
-  if (a_tcp->server.data)
-    free(a_tcp->server.data);
-  if (a_tcp->next_time)
-    a_tcp->next_time->prev_time = a_tcp->prev_time;
-  if (a_tcp->prev_time)
-    a_tcp->prev_time->next_time = a_tcp->next_time;
-  if (a_tcp == tcp_oldest)
-    tcp_oldest = a_tcp->prev_time;
-  if (a_tcp == tcp_latest)
-    tcp_latest = a_tcp->next_time;
-
-  i = a_tcp->listeners;
-
-  while (i) {
-    j = i->next;
-    free(i);
-    i = j;
-  }
-  a_tcp->next_free = free_streams;
-  free_streams = a_tcp;
-  tcp_num--;
+	return 0;
 }

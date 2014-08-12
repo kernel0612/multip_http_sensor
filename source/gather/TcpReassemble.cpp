@@ -94,7 +94,7 @@ int TcpReassemble::register_tcp_callback(void (*x)){
 	  tcp_procs = ipp;
 	return 0;
 }
-int TcpReassemble::process(u_char* data,int skblen){
+int TcpReassemble::process(u_char* data,int skblen,tcp_stream** outstream,void** data){
 	  struct ip *this_iphdr = (struct ip *)data;
 	  struct tcphdr *this_tcphdr = (struct tcphdr *)(data + 4 * this_iphdr->ip_hl);
 	  int datalen, iplen;
@@ -170,9 +170,10 @@ int TcpReassemble::process(u_char* data,int skblen){
 	       struct lurker_node *i;
 
 	       a_tcp->nids_state = NIDS_RESET;
-	       for (i = a_tcp->listeners; i; i = i->next)
-	 	(i->item) (a_tcp, &i->data);                  //回调 将数据 推给用户 然后销毁会话
-	     }
+           memcpy(*outstream,a_tcp,sizeof(tcp_stream));
+//	       for (i = a_tcp->listeners; i; i = i->next)
+//	 	(i->item) (a_tcp, &i->data);                  //回调 将数据 推给用户 然后销毁会话
+//	     }
 	     nids_free_tcp_stream(a_tcp);              //销毁
 	     return 0;
 	   }

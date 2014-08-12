@@ -29,6 +29,11 @@ public:
 	int create();
 	int destroy();
 
+	vector<string> get_ipaddress();
+	vector<string> get_ipbusiness();
+	vector<string> get_resname();
+	vector<string> get_rescode();
+
 
 private:
 	pthread_t _thread_timer;

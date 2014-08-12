@@ -90,7 +90,7 @@ public:
 	virtual ~IPfragReassemble();
 
 
-	int init(int);
+	int init(int n=256);
 	int fini();
 	int process(struct ip *, struct ip **);
 

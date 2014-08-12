@@ -144,10 +144,10 @@ public:
 	TcpReassemble();
 	virtual ~TcpReassemble();
 
-	int init(int size);
+	int init(int size=1040);
 	int fini();
 	int register_tcp_callback(void (*x));
-	int process(u_char* data,int skblen);
+	int process(u_char* data,int skblen,tcp_stream** outstream,void** data);
 
 private:
 

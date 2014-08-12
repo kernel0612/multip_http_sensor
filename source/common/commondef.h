@@ -126,11 +126,11 @@ struct RequestInfo
 	char userAgent[USERAGENT_BUF_SIZE];
 	char host[HOST_BUF_SIZE];
 	char connection[1024];
-	char loginName[64];
-	char sregion[64];       //来源地市
-	char sdepartment[64];   //来源部门
+	char loginAccount[64];
+	char ipAddress[64];       //来源地市
+	char ipBusiness[64];   //来源部门
 	char resName[64];
-	char requestContent[128];
+	char resCode[128];
 	uint32_t resID;
 	//uint32_t contentFlag;
 };

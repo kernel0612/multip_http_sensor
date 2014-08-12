@@ -15,6 +15,12 @@
 #include "StreamMap.h"                 //added by xlf 2014/7/28
 #include "globalconfig.h"              //added by xlf 2014/7/29
 #include "commondef.h"                 //added by xlf 2014/7/30
+#include "IPfragReassemble.h"
+#include "TcpReassemble.h"
+#include "HttpReassemble.h"
+#include "httpUtil.h"
+#include "htmlUtil.h"
+#include "AccessDatabase.h"
 typedef CachedMap<StreamKey, Stream> Stream_Table;
 
 /*!
@@ -88,30 +94,11 @@ private:
   int check_telnet_jump(const Stream &stream, const Frame &frame, int flag);
   int fin_telnet_jump(const Stream &stream);
 
+
   int entry_parse(const Frame& frame);
-  int parse_request_data(RequestInfo& request,const Frame& frame);
-  int parse_response_data(ResponseInfo& response,const Frame& frame);
 
+  int entry_dissect_http(tcp_stream* tcp);
 
-
-  int tcp_init(int);
-  void process_tcp(u_char *, int);
-  void process_tcp_frame(const Frame& frame);
-  static void
-  add_tcp_closing_timeout(struct tcp_stream * a_tcp);
-  struct tcp_stream *
-  find_stream(struct tcphdr * this_tcphdr, struct ip * this_iphdr,
-  	    int *from_client);
-  struct tcp_stream *
-  nids_find_tcp_stream(struct tuple4 *addr);
-  static void
-  add_new_tcp(struct tcphdr * this_tcphdr, struct ip * this_iphdr);
-  static int
-  get_ts(struct tcphdr * this_tcphdr, unsigned int * ts);
-  static int
-  get_wscale(struct tcphdr * this_tcphdr, unsigned int * ws);
-  void
-  nids_free_tcp_stream(struct tcp_stream * a_tcp);
 protected:
   //! Classifier.
   GatherClassifier &classifier_;
@@ -139,10 +126,17 @@ protected:
   int fin_;
   int repeat_;	// repeat stream statistic.
 
-  std::map<StreamKey,std::vector<RequestInfo> >  _request_table;
-  std::map<StreamKey,std::vector<ResponseInfo> > _response_table;
+  //std::map<StreamKey,std::vector<RequestInfo> >  _request_table;
+  //std::map<StreamKey,std::vector<ResponseInfo> > _response_table;
 
   //std::map<StreamKey, std::vector<Stream> > _stream_table;
+
+  IPfragReassemble* _ipfragReassembler;
+  TcpReassemble*  _tcpReassembler;
+  HttpReassemble* _httpReassembler;
+  httpUtil* _httputil;
+  htmlUtil* _htmlutil;
+  AccessDatabase* _inputdatabase;
 };
 
 
