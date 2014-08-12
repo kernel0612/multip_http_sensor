@@ -13,8 +13,6 @@
 #include <arpa/inet.h>
 #endif
 
-static struct tcp_stream **tcp_stream_table;
-
 
 
 StreamAuditor::StreamAuditor(GatherClassifier &classifier, StreamDispatcher &dispatcher)
@@ -66,6 +64,8 @@ int StreamAuditor::create()
 	  return -1;
   }
   _httpReassembler=new HttpReassemble;
+  _outputdatabase=new OutputDatabase;
+  _inputdatabase=new AccessDatabase;
   return 0;
 }
 
@@ -905,8 +905,22 @@ int StreamAuditor::entry_dissect_http(tcp_stream* tcp){
 		return -1;
 	}
 	int ret=0;
+	char saddr[64];
+	char daddr[64];
+	unsigned short sport;
+	unsigned short dport;
+	struct tuple4 ip_and_port = tcp->addr;
+	strcpy(saddr,inet_ntoa(*((struct in_addr*) &(ip_and_port.saddr))));
+	strcpy(daddr,inet_ntoa(*((struct in_addr*) &(ip_and_port.daddr))));
+	sport=ip_and_port.source;
+	dport=ip_and_port.dest;
 	httpdata* complete;
 	httpfrag frag;
+	fragKey  key;
+	key.sip=ip_and_port.saddr;
+	key.dip=ip_and_port.daddr;
+	key.sport=ip_and_port.source;
+	key.dport=ip_and_port.dest;
 	if(tcp->nids_state==NIDS_JUST_EST){
 		if (tcp->addr.dest != 80){
 			return -1;
@@ -916,9 +930,11 @@ int StreamAuditor::entry_dissect_http(tcp_stream* tcp){
 		return -1;
 	}
 	if(tcp->nids_state==NIDS_CLOSE){
+
 		return -1;
 	}
 	if(tcp->nids_state==NIDS_RESET){
+
 		return -1;
 	}
 	if(tcp->nids_state==NIDS_DATA){
@@ -926,6 +942,7 @@ int StreamAuditor::entry_dissect_http(tcp_stream* tcp){
 		if(tcp->client.count_new){
 			hlf=&tcp->client;
 			memset(&frag,0,sizeof(httpfrag));
+			frag.key=key;
 			frag.frag=hlf->data;
 			frag.fraglen=hlf->count_new;
 			frag.type=requestfrag;
@@ -947,6 +964,7 @@ int StreamAuditor::entry_dissect_http(tcp_stream* tcp){
 		if(tcp->server.count_new){
 			hlf=&tcp->server;
 			memset(&frag,0,sizeof(httpfrag));
+			frag.key=key;
 			frag.frag=hlf->data;
 			frag.fraglen=hlf->count_new;
 			frag.type=responsefrag;
@@ -955,7 +973,7 @@ int StreamAuditor::entry_dissect_http(tcp_stream* tcp){
 				ret=_httputil->parse_response(complete->data,complete->datalen);
 				if(ret==0){
 					_httputil->get_request_method();
-					_httputil->get_request_url();
+					string url=_httputil->get_request_url();
 					_httputil->get_request_httpType();
 					_httputil->get_request_acceptLanguage();
 					_httputil->get_request_referer();
@@ -966,11 +984,25 @@ int StreamAuditor::entry_dissect_http(tcp_stream* tcp){
 					_httputil->get_request_connection();
 					_httputil->get_request_payload();
 					_httputil->get_request_userAgent();
+					string ip(daddr);
+					string ipaddress;
+					string ipbusiness;
+					ret=_inputdatabase->get_ipaddressAndipbusiness(ip,ipaddress,ipbusiness);
+					if(ret==0){
+						// get ok
+					}
+					string resname;
+					string rescode;
+					string appuuid;
+					ret=_inputdatabase->get_resname_rescode_appuuid(url,ip,resname,rescode,appuuid);
+					if(ret==0){
+						//get ok
+						string rule;
+						ret=_inputdatabase->get_rule_content(appuuid,rule);
+						if(ret==0){
+							//get rule ok
 
-					_inputdatabase->get_ipaddress();
-					_inputdatabase->get_ipaddress();
-					for(int i=0;i<size();i++){
-						//Æ¥Åä
+						}
 					}
 
 				}
@@ -981,3 +1013,4 @@ int StreamAuditor::entry_dissect_http(tcp_stream* tcp){
 	}
 	return 0;
 }
+

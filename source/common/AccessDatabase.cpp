@@ -18,11 +18,13 @@ AccessDatabase::AccessDatabase() {
 	_app_obj_db_isOpen=0;
 	_ipaddress_db_isOpen=0;
 	_account_rule_db_isOpen=0;
+	pthread_mutex_init(&_mutex， NULL);
 }
 
 AccessDatabase::~AccessDatabase() {
 	// TODO Auto-generated destructor stub
 	destroy();
+	pthread_mutexattr_destroy(&_mutex);
 }
 int AccessDatabase::create(){
 //	if(_nms_app_obj==0){
@@ -101,24 +103,9 @@ int AccessDatabase::create(){
 	return 0;
 }
 int AccessDatabase::destroy(){
-//	if(_nms_app_obj){
-//		_nms_app_obj->disconnect();
-//		delete _nms_app_obj;
-//		_nms_app_obj=0;
-//		_app_obj_db_isOpen=0;
-//	}
-//	if(_nms_ipaddress){
-//		_nms_ipaddress->disconnect();
-//		delete _nms_ipaddress;
-//		_nms_ipaddress=0;
-//		_ipaddress_db_isOpen=0;
-//	}
-//	if(_nms_account_rule){
-//		_nms_account_rule->disconnect();
-//		delete _nms_account_rule;
-//		_nms_account_rule=0;
-//		_account_rule_db_isOpen=0;
-//	}
+
+    pthread_cancel(_thread_timer);
+    pthread_join(_thread_timer, NULL);
 	if(_nms_app_obj_conn){
 		_nms_app_obj_conn->disconnect();
 		delete _nms_app_obj_conn;
@@ -137,11 +124,10 @@ int AccessDatabase::destroy(){
 		_nms_account_rule_conn=0;
 		_account_rule_db_isOpen=0;
 	}
-    pthread_cancel(_thread_timer);
-    pthread_join(_thread_timer, NULL);
+
 	return 0;
 }
-int  AccessDatabase::update_local_table(){
+int  AccessDatabase::update_local_table(){                //更新还有点问题
 	if(_app_obj_db_isOpen){
 		work wk(*_nms_app_obj_conn);
 		string sql="SELECT * FROM nms_app_obj";
@@ -243,7 +229,9 @@ void* AccessDatabase::on_timer(void* p){
 	tempval.tv_sec = 300;
 	tempval.tv_usec = 0;
 	while(1){
+		pthread_mutex_lock(pthis->_mutex);
 		pthis->update_local_table();
+		pthread_mutex_unlock(pthis->_mutex);
 		select(0, NULL, NULL, NULL, &tempval);
 	}
 }
@@ -303,4 +291,109 @@ int AccessDatabase::copy_data(struct nms_account_rule& inObj,const vector<string
 		return 0;
 	}
 	return -1;
+}
+
+int AccessDatabase::get_ipaddressAndipbusiness(string& inputIP,string& matchedIPaddr,string& matchedIPbusi){
+	std::map<char*,struct nms_ipaddress>::iterator coit=_ipaddress_map.begin();
+	struct nms_ipaddress& tempobj;
+	pthread_mutex_lock(pthis->_mutex);
+	for(;coit!=_ipaddress_map.end();++coit){
+		tempobj=coit->second;
+		if(compare_ip(inputIP.c_str(),tempobj.ip_end)<=0&&
+				compare_ip(inputIP.c_str(),tempobj.ip_start)>=0){
+			matchedIPaddr=tempobj.ip_address;
+			matchedIPbusi=tempobj.ip_business;
+			pthread_mutex_unlock(pthis->_mutex);
+			return 0;
+		}
+	}
+	pthread_mutex_unlock(pthis->_mutex);
+	return -1;
+}
+int AccessDatabase::get_resname_rescode_appuuid(string& inputurl,string& inputIP,string& matchedresname,
+		string& matchedrescode,string& matcheduuid){
+	std::map<char*,struct nms_app_obj>::iterator coit=_app_obj_map.begin();
+	struct nms_app_obj& tempobj;
+	pthread_mutex_lock(pthis->_mutex);
+	for(;coit!=_app_obj_map.end();++coit){
+		tempobj=coit->second;
+		if(compare_ip(inputIP.c_str(),tempobj.app_ip)==0){
+			if(strcmp(inputurl.c_str(),tempobj.app_url)==0){
+				matchedresname=tempobj.app_name;
+				matchedrescode=tempobj.app_code;
+				matcheduuid=tempobj.app_uuid;
+				pthread_mutex_unlock(pthis->_mutex);
+				return 0;
+			}
+		}
+	}
+	pthread_mutex_unlock(pthis->_mutex);
+	return -1;
+}
+int AccessDatabase::get_rule_content(string& appuuid,string& matchedrule){
+	std::map<char*,struct nms_account_rule>::iterator coit=_account_rule_map.begin();
+	struct nms_account_rule& tempobj;
+	pthread_mutex_lock(pthis->_mutex);
+	for(;coit!=_account_rule_map.end();++coit){
+		tempobj=coit->second;
+		if(strcmp(appuuid.c_str(),tempobj.app_uuid)==0){
+			matchedrule=tempobj.rule_content;
+			pthread_mutex_unlock(pthis->_mutex);
+			return 0;
+		}
+	}
+	pthread_mutex_unlock(pthis->_mutex);
+	return -1;
+}
+int AccessDatabase::compare_ip(const char* ip1,const char* ip2){
+	if(!ip1||!ip2){
+		return -2;
+	}
+	char ip1buf[64]={0};
+	char ip2buf[64]={0};
+	int ret=0;
+	ret=inet_pton(AF_INET,ip1,(void*)ip1buf);
+	if(ret<=0){
+		return -2;
+	}
+	ret=inet_pton(AF_INET,ip2,(void*)ip2buf);
+	if(ret<=0){
+		return -2;
+	}
+	long n1=atoi(ip1buf);
+	long n2=atoi(ip2buf);
+	if(n1<n2){
+		return -1;
+	}
+	else if(n1==n2){
+		return 0;
+	}
+	return 1;
+}
+int AccessDatabase::clear_app_obj_map(){
+	std::map<char*,struct nms_app_obj>::iterator coit=_app_obj_map.begin();
+	pthread_mutex_lock(pthis->_mutex);
+	for(;coit!=_app_obj_map.end();){
+		_app_obj_map.erase(coit++);
+	}
+	pthread_mutex_unlock(pthis->_mutex);
+	return 0;
+}
+int AccessDatabase::clear_ipaddress_map(){
+	std::map<char*,struct nms_ipaddress>::iterator coit=_ipaddress_map.begin();
+	pthread_mutex_lock(pthis->_mutex);
+	for(;coit!=_ipaddress_map.end();){
+		_ipaddress_map.erase(coit++);
+	}
+	pthread_mutex_unlock(pthis->_mutex);
+	return 0;
+}
+int AccessDatabase::clear_accountrule_map(){
+	std::map<char*,struct nms_account_rule>::iterator coit=_account_rule_map.begin();
+	pthread_mutex_lock(pthis->_mutex);
+	for(;coit!=_account_rule_map.end();){
+		_account_rule_map.erase(coit++);
+	}
+	pthread_mutex_unlock(pthis->_mutex);
+	return 0;
 }

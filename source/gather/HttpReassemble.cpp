@@ -16,37 +16,48 @@ HttpReassemble::~HttpReassemble() {
 	// TODO Auto-generated destructor stub
 }
 
-int HttpReassemble::process_httpfrag(struct httpfrag* frag,struct httpdata** defrag)      //0 complete  1 not complete   -1 error
+int HttpReassemble::process_httpfrag(struct httpfrag* frag,struct http_interaction** defrag)      //0 complete  1 not complete   -1 error
 {
 	if(!frag||!defrag){
 		return -1;
 	}
 	int ret=0;
     if(frag->type==responsefrag){
-    	if((ret=is_first_response_frag(frag))){
+		if(is_frag_need_drop(frag)){
+			return 1;
+		}
+		std::map<struct fragKey,struct http_interaction >::iterator iit=
+		_interation_table.find(frag->key);
+		if(iit==_interation_table.end()){
+			return 1;
+		}
+		http_interaction hi=iit->second;
+		hi.response.push_back(frag);
+		if(is_response_done()){
+			return 0;
+		}
+    }
+    else if(frag->type==requestfrag){
+    	if((ret=is_first_request_frag(frag))){
+      		if(is_frag_need_drop(frag)){
+      			return 1;
+        	}
     		// new to map
     		http_interaction hi;
     		hi.response.push_back(frag);
     		_interation_table.insert(make_pair(frag->key,hi));
     	}
-    	else if(!ret){    //insert into map or delete from map
-    		std::map<struct fragKey,struct http_interaction > iit=
+    	else if(!ret){    //update interaction in map
+      		if(is_frag_need_drop(frag)){
+            	return 1;
+            }
+    		std::map<struct fragKey,struct http_interaction >::iterator iit=
     		_interation_table.find(frag->key);
     		if(iit==_interation_table.end()){
-    			return -1;
+    			return 1;
     		}
-
-    	}
-    	else{
-    		return -1;
-    	}
-    }
-    else if(frag->type==requestfrag){
-    	if((ret=is_first_request_frag(frag))){
-    		// new to map
-    	}
-    	else if(!ret){    //insert into map or delete from map
-
+    		http_interaction hi=iit->second;
+    		hi.request.push_back(frag);
     	}
     	else{
     		return -1;
@@ -180,3 +191,46 @@ int HttpReassemble::get_header_field(const char* source,string& field,const char
     }
 	return -1;
 }
+
+int HttpReassemble::if_finded_erase_it(struct fragKey& key){
+	set<struct fragKey>::iterator it=_drop_requests.begin();
+	for(;it!=_drop_requests.end();){
+		if(*it==key){
+			it=_drop_requests.erase(it);
+			return 0;
+		}
+		else{
+			++it;
+		}
+	}
+	return -1;
+}
+int HttpReassemble::process_interaction_status(struct fragKey& key,uint32_t status){
+	switch(status){
+	case interaction_close:
+	case interaction_rst:
+	case interaction_timeout:
+		if_finded_erase_it(key);
+		break;
+	case interaction_begin:
+	case interaction_update:
+		break;
+	default:
+		//err
+		break;
+
+	}
+	return 0;
+}
+int HttpReassemble::is_frag_need_drop(struct httpfrag* frag){
+	if(!frag){
+		return -1;
+	}
+	//利用配置的规则
+	if(1){
+		_drop_requests.insert(frag->key);
+		return 1;
+	}
+	return 0;
+}
+

@@ -11,6 +11,7 @@
 #include<string>
 #include<vector>
 #include<map>
+#include<set>
 #include<stdint.h>
 using namespace std;
 //合并出 完整的一次http的请求和对应的响应  为下一步 分析http字段提供必要的条件
@@ -39,10 +40,16 @@ struct httpfrag{
 	uint32_t fraglen;
 	uint32_t type;
 };
-struct http_interaction{
+struct http_interaction{              //一次请求和响应
 	uint32_t status;
 	vector<struct httpfrag*> request;
 	vector<struct httpfrag*> response;
+};
+struct http_session{                 //一次会话
+	char sessionid[64];
+	uint32_t start;
+	uint32_t end;
+	vector<struct http_interaction> interactons;
 };
 struct httpdata{
 	char* data;
@@ -52,7 +59,9 @@ class HttpReassemble {
 public:
 	HttpReassemble();
 	virtual ~HttpReassemble();
-	int process_httpfrag(struct httpfrag* frag,struct httpdata** defrag);      //0 complete  1 not complete   -1 error
+	int load_config();  //加载过滤
+	int process_httpfrag(struct httpfrag* frag,struct http_interaction** defrag);      //0 complete  1 not complete   -1 error  2 need drop
+	int process_interaction_status(struct fragKey& key,uint32_t status);
 private:
 	int is_first_response_frag(struct httpfrag* frag);   // 包含 HTTP/1.1 200 OK 的包  ret 1  or return 0 -1 error
 	int is_first_request_frag(struct httpfrag* frag);    //包含 GET HEAD POST 的包  ret 1  or return 0 -1 error
@@ -63,10 +72,14 @@ private:
 	char* response_glue();
 	char* request_glue();
 	int get_header_field(const char* source,string& field,const char* fieldName);
+	int if_finded_erase_it(struct fragKey& key);
+	int is_frag_need_drop(struct httpfrag* frag);  //请求被丢弃 则 响应也不捕获
 
 private:
     std::map<struct fragKey,struct http_interaction > _interation_table;
-    std::map<struct fragKey,timer> _interacion_timer;
+   // std::map<struct fragKey,timer> _interacion_timer;
+
+    set<struct fragKey> _drop_requests;
 
 };
 

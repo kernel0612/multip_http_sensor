@@ -9,6 +9,7 @@
 #include "StreamDispatcher.h"
 
 #include <vector>
+#include <set>
 #include <ace/Task.h>
 #include <ace/Process.h>
 
@@ -21,6 +22,7 @@
 #include "httpUtil.h"
 #include "htmlUtil.h"
 #include "AccessDatabase.h"
+#include "OutputDatabase.h"
 typedef CachedMap<StreamKey, Stream> Stream_Table;
 
 /*!
@@ -99,6 +101,11 @@ private:
 
   int entry_dissect_http(tcp_stream* tcp);
 
+  int get_matched_ipaddress_and_ipbusiness(string& inputIP,vector<string>& tarIP,
+		  string& matIP,string& output);
+
+
+
 protected:
   //! Classifier.
   GatherClassifier &classifier_;
@@ -137,6 +144,9 @@ protected:
   httpUtil* _httputil;
   htmlUtil* _htmlutil;
   AccessDatabase* _inputdatabase;
+  OutputDatabase* _outputdatabase;
+
+
 };
 
 

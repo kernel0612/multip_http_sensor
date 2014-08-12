@@ -19,6 +19,10 @@
 #include"commondef.h"
 #include"globalconfig.h"
 #include <pqxx/pqxx>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <pthread.h>
 using namespace std;
 using namespace pqxx;
 class AccessDatabase {
@@ -29,10 +33,10 @@ public:
 	int create();
 	int destroy();
 
-	vector<string> get_ipaddress();
-	vector<string> get_ipbusiness();
-	vector<string> get_resname();
-	vector<string> get_rescode();
+	int get_ipaddressAndipbusiness(string& inputIP,string& matchedIPaddr,string& matchedIPbusi);
+	int get_resname_rescode_appuuid(string& inputurl,string& inputIP,string& matchedresname,
+			string& matchedrescode,string& matcheduuid);
+	int get_rule_content(string& appuuid,string& matchedrule);
 
 
 private:
@@ -46,9 +50,12 @@ private:
 	int copy_data(struct nms_ipaddress& inObj,const vector<string>& src);
 	int copy_data(struct nms_account_rule& inObj,const vector<string>& src);
 
-	//PQ* _nms_app_obj;
-	//PQ* _nms_ipaddress;
-	//PQ* _nms_account_rule;
+	int compare_ip(const char* ip1,const char* ip2);
+	int clear_app_obj_map();
+	int clear_ipaddress_map();
+	int clear_accountrule_map();
+
+
 
 	connection*  _nms_app_obj_conn;
 	connection*  _nms_ipaddress_conn;
@@ -62,7 +69,7 @@ private:
 	std::map<char*,struct nms_ipaddress> _ipaddress_map;
 	std::map<char*,struct nms_account_rule> _account_rule_map;
 
-
+	pthread_mutex_t  _mutex;
 };
 
 #endif /* ACCESSDATABASE_H_ */
